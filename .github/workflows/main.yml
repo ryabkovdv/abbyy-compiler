@@ -36,5 +36,5 @@ jobs:
 
       - name: Autotests
         run: |
-          cd debug
+          cd build
           ctest
