@@ -61,8 +61,9 @@ COMMENT \/\/[^\n]*
 "\."            { return TOK_DOT; }
 ";"             { return TOK_SEMICOLON; }
 
-.               { return TOK_ERROR; }
 {NUMBER}        { return TOK_NUMBER; }
 {IDENTIFIER}    { return TOK_IDENTIFIER; }
+
+.               { return TOK_ERROR; }
 
 %%
