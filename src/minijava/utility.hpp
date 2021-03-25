@@ -22,6 +22,32 @@
 
 namespace minijava {
 
+template <typename F>
+class [[nodiscard]] ScopeExit {
+public:
+    ScopeExit(const ScopeExit&) = delete;
+    ScopeExit& operator=(const ScopeExit&) = delete;
+
+    explicit constexpr ScopeExit(F callback) noexcept
+        : m_callback(std::move(callback))
+    {}
+
+    ~ScopeExit() noexcept
+    {
+        if (m_active)
+            m_callback();
+    }
+
+    constexpr void cancel() noexcept
+    {
+        m_active = false;
+    }
+
+private:
+    F m_callback;
+    bool m_active = true;
+};
+
 class BumpAllocator {
 public:
     static constexpr size_t MaxAlign = 64;
@@ -39,6 +65,7 @@ public:
     [[gnu::malloc, gnu::alloc_size(2), gnu::alloc_align(3)]]
     void* allocate(size_t size, size_t alignment)
     {
+        assert(alignment <= MaxAlign);
         assert(ptrdiff_t(size) >= 0 && "allocation size overflow");
 
         size_t aligned_space = m_space & -alignment;
@@ -169,16 +196,6 @@ void array_overflow();
 [[gnu::noinline]]
 void array_grow(void* opaque, size_t elem_info);
 
-template <size_t Size, size_t Align>
-[[gnu::noinline]]
-void array_reserve(void* opaque, size_t min_cap)
-{
-    constexpr auto MaxCap = std::numeric_limits<ptrdiff_t>::max() / (Size << 8);
-    if (min_cap > MaxCap) [[unlikely]]
-        detail::array_overflow();
-    detail::array_grow(opaque, Align | (min_cap * (Size << 8)));
-}
-
 } // namespace detail
 
 template <typename T>
@@ -211,18 +228,21 @@ public:
     {
         if (capacity() >= min_cap)
             return;
-        detail::array_reserve<sizeof(T), Align>(this, min_cap);
+
+        constexpr auto MaxCap = std::numeric_limits<ptrdiff_t>::max() / Size;
+        if (min_cap > MaxCap) [[unlikely]]
+            detail::array_overflow();
+        detail::array_grow(this, Align | (min_cap * Size));
     }
 
     template <typename... Args>
     T& emplace_back(Args&&... args)
     {
         if (m_end == m_cap) [[unlikely]]
-            grow();
+            detail::array_grow(this, Align | (MinCap * Size));
 
         ::new (m_end) T(std::forward<Args>(args)...);
-        ++m_end;
-        return m_end[-1];
+        return *m_end++;
     }
 
     T& push_back(const T& x)
@@ -299,6 +319,7 @@ private:
 
     static_assert(alignof(T) <= BumpAllocator::MaxAlign);
 
+    static constexpr auto Size = sizeof(T) << 8;
     static constexpr auto Align = std::max<size_t>(alignof(T), 8);
     static constexpr auto MinCap = []() -> size_t {
         if (sizeof(T) == 1)
@@ -307,11 +328,6 @@ private:
             return 8;
         return std::max<size_t>(64 / sizeof(T), 2);
     }();
-
-    void grow()
-    {
-        detail::array_grow(this, Align | (MinCap * sizeof(T)) << 8);
-    }
 };
 
 template <typename To, typename From>
