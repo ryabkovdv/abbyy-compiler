@@ -1,27 +1,54 @@
-FLEX_TARGET(Lexer
-        ${CMAKE_SOURCE_DIR}/src/minijava/parser/lexer.l
-        "${CMAKE_BINARY_DIR}/lexer.cpp"
-        COMPILE_FLAGS --header=${CMAKE_BINARY_DIR}/lexer.hpp)
+FLEX_TARGET(
+        FlexLexer
+        ${PROJECT_SOURCE_DIR}/src/minijava/parser/lexer.l
+        "${PROJECT_BINARY_DIR}/lexer_impl.cpp"
+        COMPILE_FLAGS --header=${PROJECT_BINARY_DIR}/lexer_impl.hpp)
 
-BISON_TARGET(Parser
-        ${CMAKE_SOURCE_DIR}/src/minijava/parser/parser.y
-        "${CMAKE_BINARY_DIR}/parser.cpp"
+BISON_TARGET(
+        BisonParser
+        ${PROJECT_SOURCE_DIR}/src/minijava/parser/parser.y
+        "${PROJECT_BINARY_DIR}/parser_impl.cpp"
         VERBOSE)
 
-add_executable(MiniJava
+ADD_FLEX_BISON_DEPENDENCY(FlexLexer BisonParser)
+
+add_custom_command(
+        OUTPUT  ${PROJECT_BINARY_DIR}/ast_decl.hpp
+        COMMAND ${Python3_EXECUTABLE}
+                "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-gen.py"
+                "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast.json"
+                "${PROJECT_BINARY_DIR}/ast_decl.hpp"
+        VERBATIM
+        DEPENDS "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-gen.py"
+                "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast.json"
+        COMMENT "Generating AST declarations")
+
+set_source_files_properties(
+        ${PROJECT_SOURCE_DIR}/src/minijava/parser/parser.cpp
+        PROPERTIES OBJECT_DEPENDS ${PROJECT_BINARY_DIR}/ast_decl.hpp)
+
+add_executable(
+        minijava
         main.cpp
-        ${FLEX_Lexer_OUTPUTS}
-        ${BISON_Parser_OUTPUTS})
+        utility.cpp
+        parser/parser.cpp
+        ${FLEX_FlexLexer_OUTPUTS}
+        ${BISON_BisonParser_OUTPUTS})
 
-target_include_directories(MiniJava PRIVATE ${CMAKE_BINARY_DIR})
+target_include_directories(minijava PRIVATE ${PROJECT_BINARY_DIR})
 
-file(GLOB test_samples "${CMAKE_SOURCE_DIR}/tests/*")
+if (CMAKE_COMPILER_IS_GNUCC)
+    target_compile_options(minijava PRIVATE "-Wall" "-Wextra" "-Wno-missing-braces")
+endif()
+if (MSVC)
+    target_compile_options(minijava PRIVATE "/W4")
+endif()
+
+file(GLOB test_samples "${PROJECT_SOURCE_DIR}/tests/*")
 foreach(file ${test_samples})
     get_filename_component(fname ${file} NAME)
     add_test(NAME Scan_${fname}
-             COMMAND ${CMAKE_BINARY_DIR}/src/minijava/MiniJava scan ${file})
+             COMMAND ${PROJECT_BINARY_DIR}/src/minijava/minijava scan ${file})
+    add_test(NAME Parse_${fname}
+             COMMAND ${PROJECT_BINARY_DIR}/src/minijava/minijava parse ${file})
 endforeach(file ${test_samples})
-
-add_test(NAME Parse_Expression
-         COMMAND ${CMAKE_BINARY_DIR}/src/minijava/MiniJava
-         parse "${CMAKE_SOURCE_DIR}/tests/Expression.java")

@@ -3,9 +3,11 @@ project(MiniJava)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
 enable_testing()
 
+find_package(Python3 REQUIRED)
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
 
