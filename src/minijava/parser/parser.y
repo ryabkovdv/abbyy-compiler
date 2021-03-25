@@ -1,8 +1,7 @@
 %{
 #define POOL (tree->pool)
 #define YY_EXTRA_TYPE minijava::BumpAllocator*
-#define YYCOPY(Dst, Src, Count) \
-        std::memcpy((void*)(Dst), (const void*)(Src), (Count) * sizeof(*(Src)))
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
 
 #include <parser_impl.hpp>
 #include <lexer_impl.hpp>

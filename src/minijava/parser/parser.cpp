@@ -15,12 +15,13 @@ int minijava::parse(FILE* file, AstTree* tree)
         return 1;
 
     YY_BUFFER_STATE buffer = yy_create_buffer(file, YY_BUF_SIZE, scanner);
-    yy_switch_to_buffer(buffer, scanner);
 
+    ScopeExit free_scanner([&] { yylex_destroy(scanner); });
+    ScopeExit free_buffer([&] { yy_delete_buffer(buffer, scanner); });
+
+    yy_switch_to_buffer(buffer, scanner);
     int parse_status = yyparse(scanner, tree);
 
-    yy_delete_buffer(buffer, scanner);
-    yylex_destroy(scanner);
     if (!tree->valid)
         return 2;
     if (parse_status != 0)
@@ -31,20 +32,20 @@ int minijava::parse(FILE* file, AstTree* tree)
 int minijava::print_tokens(FILE* file)
 {
     BumpAllocator pool;
-
     yyscan_t scanner;
     if (yylex_init_extra(&pool, &scanner) != 0)
         return 1;
 
     YY_BUFFER_STATE buffer = yy_create_buffer(file, YY_BUF_SIZE, scanner);
-    yy_switch_to_buffer(buffer, scanner);
+
+    ScopeExit free_scanner([&] { yylex_destroy(scanner); });
+    ScopeExit free_buffer([&] { yy_delete_buffer(buffer, scanner); });
 
     YYSTYPE yylval;
     YYLTYPE yylloc;
+    yy_switch_to_buffer(buffer, scanner);
     while (int token = yylex(&yylval, &yylloc, scanner))
         print_token(token);
 
-    yy_delete_buffer(buffer, scanner);
-    yylex_destroy(scanner);
     return 0;
 }
