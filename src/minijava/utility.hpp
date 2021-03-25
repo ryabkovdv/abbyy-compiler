@@ -202,9 +202,9 @@ public:
         reserve(init_cap);
     }
 
-    void clear() noexcept
+    void reset() noexcept
     {
-        m_begin = m_end;
+        m_begin = m_end = m_cap = nullptr;
     }
 
     void reserve(size_t min_cap)

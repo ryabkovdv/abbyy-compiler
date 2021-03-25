@@ -85,7 +85,7 @@ COMMENT \/\/[^\n]*
                     return TOK_NUMBER;
                 }
 
-{IDENT}    {
+{IDENT}         {
                     yylval->string = make_gcstring(yytext, yyleng, yyextra);
                     return TOK_IDENT;
                 }
