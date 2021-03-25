@@ -1,0 +1,121 @@
+{
+    "ClassDecl": {
+        "name": "string",
+        "base": "string",
+        "records": "[]ClassRecord"
+    },
+
+    "ClassRecord": {},
+    "ClassVarDecl": {
+        "<base>": "ClassRecord",
+        "name": "string",
+        "type": "string"
+    },
+    "MethodDecl": {
+        "<extern base>": "ClassRecord"
+    },
+
+    "Stmt": {},
+    "VarDecl": {
+        "<base>": "Stmt",
+        "name": "string",
+        "type": "string"
+    },
+    "CompoundStmt": {
+        "<base>": "Stmt",
+        "body": "[]Stmt"
+    },
+    "IfStmt": {
+        "<base>": "Stmt",
+        "condition": "Expr",
+        "if_branch": "Stmt",
+        "else_branch": "Stmt"
+    },
+    "WhileStmt": {
+        "<base>": "Stmt",
+        "condition": "Expr",
+        "body": "Stmt"
+    },
+    "ReturnStmt": {
+        "<base>": "Stmt",
+        "expr": "Expr"
+    },
+    "PrintStmt": {
+        "<base>": "Stmt",
+        "arguments": "[]Expr"
+    },
+    "VarAssignStmt": {
+        "<base>": "Stmt",
+        "name": "string",
+        "value": "Expr"
+    },
+    "ArrayAssignStmt": {
+        "<base>": "Stmt",
+        "name": "string",
+        "index": "Expr",
+        "value": "Expr"
+    },
+
+    "Expr": {
+        "<base>": "Stmt"
+    },
+    "BinaryExpr": {
+        "<base>": "Expr",
+        "lhs": "Expr",
+        "rhs": "Expr"
+    },
+    "MulExpr": { "<base>": "BinaryExpr" },
+    "DivExpr": { "<base>": "BinaryExpr" },
+    "RemExpr": { "<base>": "BinaryExpr" },
+    "AddExpr": { "<base>": "BinaryExpr" },
+    "SubExpr": { "<base>": "BinaryExpr" },
+    "EqExpr":  { "<base>": "BinaryExpr" },
+    "NeExpr":  { "<base>": "BinaryExpr" },
+    "LtExpr":  { "<base>": "BinaryExpr" },
+    "LeExpr":  { "<base>": "BinaryExpr" },
+    "GtExpr":  { "<base>": "BinaryExpr" },
+    "GeExpr":  { "<base>": "BinaryExpr" },
+    "AndExpr": { "<base>": "BinaryExpr" },
+    "OrExpr":  { "<base>": "BinaryExpr" },
+
+    "NotExpr": {
+        "<base>": "Expr",
+        "expr": "Expr"
+    },
+    "SubscriptExpr": {
+        "<base>": "Expr",
+        "array": "Expr",
+        "index": "Expr"
+    },
+    "CallExpr": {
+        "<base>": "Expr",
+        "object": "Expr",
+        "name": "string",
+        "arguments": "[]Expr"
+    },
+    "LengthExpr": {
+        "<base>": "Expr",
+        "expr": "Expr"
+    },
+    "NewIntArrayExpr": {
+        "<base>": "Expr",
+        "count": "Expr"
+    },
+    "NewObjectExpr": {
+        "<base>": "Expr",
+        "name": "string"
+    },
+    "IdentExpr": {
+        "<base>": "Expr",
+        "name": "string"
+    },
+    "IntExpr": {
+        "<extern base>": "Expr"
+    },
+    "BoolExpr": {
+        "<extern base>": "Expr"
+    },
+    "ThisExpr": {
+        "<extern base>": "Expr"
+    }
+}
