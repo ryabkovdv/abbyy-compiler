@@ -5,8 +5,8 @@
 
 namespace minijava {
 
-int parse(FILE* file, AstTree* tree);
-int print_tokens(FILE* file);
+std::error_code parse(FILE* file, AstTree* tree);
+std::error_code print_tokens(FILE* file);
 
 } // namespace minijava
 

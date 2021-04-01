@@ -38,7 +38,7 @@ int main(int argc, const char** argv)
         return -3;
     }
 
-    int error;
+    std::error_code error;
     switch (command) {
     case Command::Scan: {
         error = minijava::print_tokens(file);
@@ -48,16 +48,18 @@ int main(int argc, const char** argv)
         minijava::AstTree tree;
         error = minijava::parse(file, &tree);
         auto class_count = tree.classes.size();
-        auto stmt_count = tree.main.size();
-        if (error == 0) {
+        if (!error) {
             std::printf("Parsed successfully, "
-                        "%zu class%s in file, "
-                        "%zu statement%s in main\n",
-                        class_count, (class_count == 1) ? "" : "es",
-                        stmt_count, (stmt_count == 1) ? "" : "s");
+                        "%zu class%s in file\n",
+                        class_count, (class_count == 1) ? "" : "es");
         }
         break;
     }
     }
-    return error;
+
+    if (!error)
+        return 0;
+
+    std::fprintf(stderr, "%s\n", error.message().c_str());
+    return 1;
 }

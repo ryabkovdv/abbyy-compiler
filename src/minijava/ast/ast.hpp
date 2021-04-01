@@ -5,15 +5,6 @@
 
 namespace minijava {
 
-struct Parameter {
-    std::string_view name;
-    std::string_view type;
-
-    Parameter(std::string_view name, std::string_view type)
-        : name(name), type(type)
-    {}
-};
-
 struct MethodDecl : ClassRecord {
     enum Access : int {
         Public,
@@ -26,47 +17,82 @@ struct MethodDecl : ClassRecord {
     Span<Parameter> parameters;
     Span<const Stmt*> body;
 
-    explicit MethodDecl(Access access, std::string_view name,
-                        std::string_view type, Span<Parameter> parameters,
-                        Span<const Stmt*> body)
+    explicit constexpr MethodDecl(Access access, std::string_view name,
+                                  std::string_view type,
+                                  Span<Parameter> parameters,
+                                  Span<const Stmt*> body)
         : ClassRecord{ClassRecord::MethodDecl}, access(access), name(name),
           type(type), parameters(parameters), body(body)
     {}
 
-    static bool classof(const ClassRecord* record)
+    static constexpr bool classof(const ClassRecord& record)
     {
-        return record->kind == ClassRecord::MethodDecl;
+        return record.kind == ClassRecord::MethodDecl;
     }
 };
 
-struct IntExpr : Expr {
-    std::string_view value;
+struct ThisExpr : Expr {
+    static const ThisExpr Instance;
 
-    explicit IntExpr(std::string_view value) : Expr{Stmt::IntExpr}, value(value)
+    constexpr ThisExpr() : Expr{Stmt::ThisExpr}
     {}
+
+    static constexpr bool classof(const Stmt& record)
+    {
+        return record.kind == Stmt::ThisExpr;
+    }
 };
 
-struct BoolExpr : Expr {
+inline const ThisExpr ThisExpr::Instance{};
+
+struct BoolLiteral : Expr {
+    static const BoolLiteral True;
+    static const BoolLiteral False;
+
     bool value;
 
-    static const BoolExpr TrueValue;
-    static const BoolExpr FalseValue;
+    explicit constexpr BoolLiteral(bool value)
+        : Expr{Stmt::BoolLiteral}, value(value)
+    {}
+
+    static constexpr bool classof(const Stmt& record)
+    {
+        return record.kind == Stmt::BoolLiteral;
+    }
 };
 
-struct ThisExpr : Expr {
-    static const ThisExpr Value;
-};
-
-inline const ThisExpr ThisExpr::Value = ThisExpr{Stmt::ThisExpr};
-inline const BoolExpr BoolExpr::TrueValue = BoolExpr{Stmt::BoolExpr, true};
-inline const BoolExpr BoolExpr::FalseValue = BoolExpr{Stmt::BoolExpr, false};
+inline const BoolLiteral BoolLiteral::True{true};
+inline const BoolLiteral BoolLiteral::False{false};
 
 struct AstTree {
     Span<const ClassDecl*> classes;
-    Span<const Stmt*> main;
+    const Stmt* main;
 
     BumpAllocator pool;
-    bool valid = true;
+};
+
+template <typename V, typename RetT = void, typename TreeRetT = void>
+struct AstVisitor : detail::AstVisitorImpl<V, RetT> {
+    constexpr TreeRetT visit(const AstTree* tree)
+    {
+        return visit(*tree);
+    }
+
+    constexpr TreeRetT visit(const AstTree& tree)
+    {
+        return static_cast<V*>(this)->visitTree(tree);
+    }
+
+    constexpr void visitTree(const AstTree& tree)
+    {
+        static_cast<V*>(this)->visitMain(*tree.main);
+        visit(tree.classes);
+    }
+
+    constexpr void visitMain(const Stmt& main)
+    {
+        (void)visit(main);
+    }
 };
 
 } // namespace minijava
