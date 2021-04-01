@@ -48,7 +48,7 @@ file(GLOB test_samples "${PROJECT_SOURCE_DIR}/tests/*")
 foreach(file ${test_samples})
     get_filename_component(fname ${file} NAME)
     add_test(NAME Scan_${fname}
-             COMMAND ${PROJECT_BINARY_DIR}/src/minijava/minijava scan ${file})
+             COMMAND ${PROJECT_BINARY_DIR}/minijava scan ${file})
     add_test(NAME Parse_${fname}
-             COMMAND ${PROJECT_BINARY_DIR}/src/minijava/minijava parse ${file})
+             COMMAND ${PROJECT_BINARY_DIR}/minijava parse ${file})
 endforeach(file ${test_samples})

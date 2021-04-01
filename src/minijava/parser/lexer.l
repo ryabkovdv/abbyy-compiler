@@ -15,9 +15,6 @@
     }
 
 using namespace minijava;
-
-static std::string_view
-make_gcstring(const char* str, int len, BumpAllocator* pool);
 %}
 
 %option 8bit reentrant never-interactive bison-bridge bison-locations
@@ -81,24 +78,13 @@ COMMENT \/\/[^\n]*
 ";"             { return TOK_SEMICOLON; }
 
 {NUMBER}        {
-                    yylval->string = make_gcstring(yytext, yyleng, yyextra);
+                    yylval->string = dup_string(*yyextra, yytext, yyleng);
                     return TOK_NUMBER;
                 }
 
 {IDENT}         {
-                    yylval->string = make_gcstring(yytext, yyleng, yyextra);
+                    yylval->string = dup_string(*yyextra, yytext, yyleng);
                     return TOK_IDENT;
                 }
 
 .               { return TOK_INVALID; }
-
-%%
-
-static std::string_view
-make_gcstring(const char* str, int len, BumpAllocator* pool)
-{
-    size_t size = (unsigned)len;
-    auto* data = static_cast<char*>(pool->allocate(size, 1));
-    std::memcpy(data, str, size);
-    return std::string_view(data, size);
-}

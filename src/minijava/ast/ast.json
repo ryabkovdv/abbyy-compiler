@@ -1,4 +1,9 @@
 {
+    "Parameter": {
+        "name": "string",
+        "type": "string"
+    },
+
     "ClassDecl": {
         "name": "string",
         "base": "string",
@@ -44,15 +49,9 @@
         "<base>": "Stmt",
         "arguments": "[]Expr"
     },
-    "VarAssignStmt": {
+    "AssignStmt": {
         "<base>": "Stmt",
-        "name": "string",
-        "value": "Expr"
-    },
-    "ArrayAssignStmt": {
-        "<base>": "Stmt",
-        "name": "string",
-        "index": "Expr",
+        "target": "Expr",
         "value": "Expr"
     },
 
@@ -109,13 +108,14 @@
         "<base>": "Expr",
         "name": "string"
     },
-    "IntExpr": {
-        "<extern base>": "Expr"
-    },
-    "BoolExpr": {
-        "<extern base>": "Expr"
+    "IntLiteral": {
+        "<base>": "Expr",
+        "value": "string"
     },
     "ThisExpr": {
+        "<extern base>": "Expr"
+    },
+    "BoolLiteral": {
         "<extern base>": "Expr"
     }
 }

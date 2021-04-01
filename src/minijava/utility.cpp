@@ -7,7 +7,8 @@ using namespace minijava;
 void* BumpAllocator::allocate_block(size_t size, size_t alignment)
 {
     size_t header = std::max(alignment, sizeof(Block));
-    size_t block_size = (size < 2048) ? 32768 : size + header;
+    bool update_base = (size < 2048);
+    size_t block_size = update_base ? 32768 : size + header;
 
     auto* ptr = static_cast<std::byte*>(std::malloc(block_size));
     if (ptr == nullptr) [[unlikely]]
@@ -20,7 +21,7 @@ void* BumpAllocator::allocate_block(size_t size, size_t alignment)
     };
 
     auto* aligned = align_down(ptr + header, alignment);
-    if (size < 2048) {
+    if (update_base) {
         m_base = align_down(ptr + block_size, MaxAlign);
         m_space = m_base - (aligned + size);
     }

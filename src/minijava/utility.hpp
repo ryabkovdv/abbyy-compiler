@@ -16,7 +16,9 @@
 #include <memory>
 #include <new>
 #include <numeric>
+#include <string>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 
@@ -118,6 +120,8 @@ template <typename T>
 class Span {
 public:
     Span() = default;
+    Span(const Span&) = default;
+    Span& operator=(const Span&) = default;
 
     constexpr Span(T* first, size_t count) noexcept
         : m_begin(first), m_end(first + count)
@@ -126,16 +130,16 @@ public:
     constexpr Span(T* first, T* last) noexcept : m_begin(first), m_end(last)
     {}
 
-    template <size_t N>
-    constexpr Span(T (&array)[N]) noexcept
-        : m_begin(std::begin(array)), m_end(std::end(array))
-    {}
-
-    template <typename R,
-              typename = std::void_t<decltype(std::declval<R&>().data()),
-                                     decltype(std::declval<R&>().size())>>
-    constexpr Span(R& range) noexcept
-        : m_begin(range.data()), m_end(m_begin + range.size())
+    template <typename R, typename = std::void_t<
+        std::enable_if_t<!std::is_same_v<R, Span>>,
+        decltype(std::data(std::declval<R>())),
+        decltype(std::size(std::declval<R>())),
+        std::enable_if_t<std::is_convertible_v<
+            std::remove_pointer_t<decltype(std::data(std::declval<R&>()))> (*)[],
+            T (*)[]
+        >>>>
+    constexpr Span(R&& range) noexcept
+        : m_begin(std::data(range)), m_end(m_begin + std::size(range))
     {}
 
     constexpr T& operator[](size_t i) const noexcept
@@ -188,6 +192,12 @@ private:
     T* m_end = nullptr;
 };
 
+template <typename R>
+Span(R& range) -> Span<std::remove_pointer_t<decltype(std::data(range))>>;
+
+template <typename R>
+Span(const R& range) -> Span<std::remove_pointer_t<decltype(std::data(range))>>;
+
 namespace detail {
 
 [[noreturn, gnu::noinline]]
@@ -202,6 +212,7 @@ template <typename T>
 class GCArray {
 public:
     static_assert(std::is_trivially_copyable_v<T>);
+    static_assert(alignof(T) <= BumpAllocator::MaxAlign);
 
     GCArray() = default;
 
@@ -211,10 +222,11 @@ public:
     GCArray(const GCArray&) = delete;
     GCArray& operator=(const GCArray&) = delete;
 
-    explicit GCArray(BumpAllocator& pool) noexcept : m_pool(&pool)
+    explicit constexpr GCArray(BumpAllocator& pool) noexcept : m_pool(&pool)
     {}
 
-    explicit GCArray(size_t init_cap, BumpAllocator& pool) : m_pool(&pool)
+    explicit constexpr GCArray(size_t init_cap, BumpAllocator& pool)
+        : m_pool(&pool)
     {
         reserve(init_cap);
     }
@@ -229,18 +241,18 @@ public:
         if (capacity() >= min_cap)
             return;
 
-        constexpr auto MaxCap = std::numeric_limits<ptrdiff_t>::max() / Size;
+        constexpr auto MaxCap =
+            std::numeric_limits<ptrdiff_t>::max() / SizeInfo;
         if (min_cap > MaxCap) [[unlikely]]
             detail::array_overflow();
-        detail::array_grow(this, Align | (min_cap * Size));
+        detail::array_grow(this, Align | (min_cap * SizeInfo));
     }
 
     template <typename... Args>
     T& emplace_back(Args&&... args)
     {
         if (m_end == m_cap) [[unlikely]]
-            detail::array_grow(this, Align | (MinCap * Size));
-
+            detail::array_grow(this, Align | (MinCap * SizeInfo));
         ::new (m_end) T(std::forward<Args>(args)...);
         return *m_end++;
     }
@@ -263,10 +275,8 @@ public:
 
     T pop_back_value() noexcept
     {
-        assert(!empty());
-        T* last = --m_end;
-        T value = std::move(*last);
-        return value;
+        pop_back();
+        return std::move(*m_end);
     }
 
     T& operator[](size_t i) noexcept
@@ -317,9 +327,7 @@ private:
     T* m_cap = nullptr;
     BumpAllocator* m_pool;
 
-    static_assert(alignof(T) <= BumpAllocator::MaxAlign);
-
-    static constexpr auto Size = sizeof(T) << 8;
+    static constexpr auto SizeInfo = sizeof(T) << 8;
     static constexpr auto Align = std::max<size_t>(alignof(T), 8);
     static constexpr auto MinCap = []() -> size_t {
         if (sizeof(T) == 1)
@@ -329,6 +337,16 @@ private:
         return std::max<size_t>(64 / sizeof(T), 2);
     }();
 };
+
+template <typename... Args>
+auto dup_string(BumpAllocator& pool, Args&&... args)
+    -> decltype(std::string_view(std::forward<Args>(args)...))
+{
+    auto str = std::string_view(std::forward<Args>(args)...);
+    auto* data = static_cast<char*>(pool.allocate(str.size(), 1));
+    std::memcpy(data, str.data(), str.size());
+    return std::string_view(data, str.size());
+}
 
 template <typename To, typename From>
 struct copy_cv {
@@ -354,14 +372,26 @@ template <typename To, typename From>
 using copy_cv_t = typename copy_cv<To, From>::type;
 
 template <typename To, typename From>
-constexpr bool isa(From* from) noexcept
+constexpr bool isa(From& from) noexcept
 {
-    assert(from != nullptr);
-
     if constexpr (std::is_base_of_v<To, From>)
         return true;
     else
         return To::classof(from);
+}
+
+template <typename To, typename From>
+constexpr bool isa(From* from) noexcept
+{
+    assert(from != nullptr);
+    return isa<To>(*from);
+}
+
+template <typename To, typename From>
+constexpr auto cast(From& from) -> copy_cv_t<To, From>&
+{
+    assert(isa<To>(from));
+    return static_cast<copy_cv_t<To, From>&>(from);
 }
 
 template <typename To, typename From>
