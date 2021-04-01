@@ -91,6 +91,7 @@ VISITOR = Template("""\
         switch (node.kind) {
 $cases
         }
+        unreachable("invalid node kind");
     }
 """)
 

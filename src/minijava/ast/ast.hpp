@@ -73,6 +73,8 @@ struct AstTree {
 
 template <typename V, typename RetT = void, typename TreeRetT = void>
 struct AstVisitor : detail::AstVisitorImpl<V, RetT> {
+    using detail::AstVisitorImpl<V, RetT>::visit;
+
     constexpr TreeRetT visit(const AstTree* tree)
     {
         return visit(*tree);

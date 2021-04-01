@@ -24,6 +24,17 @@
 
 namespace minijava {
 
+[[noreturn]]
+inline void unreachable(const char* msg)
+{
+    (void)msg;
+#ifdef _MSC_VER
+    __assume(0);
+#elif defined(__GNUC__)
+    __builtin_unreachable();
+#endif
+}
+
 template <typename F>
 class [[nodiscard]] ScopeExit {
 public:
