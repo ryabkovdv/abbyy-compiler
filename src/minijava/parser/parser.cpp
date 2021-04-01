@@ -63,24 +63,3 @@ std::error_code minijava::parse(FILE* file, AstTree* tree)
         return ParseError{status};
     return {};
 }
-
-void print_token(int token);
-
-std::error_code minijava::print_tokens(FILE* file)
-{
-    BumpAllocator pool;
-    yyscan_t scanner;
-    if (yylex_init_extra(&pool, &scanner) != 0)
-        return ParseError::InitFailure;
-    ScopeExit free_scanner([&] { yylex_destroy(scanner); });
-
-    YY_BUFFER_STATE buffer = yy_create_buffer(file, YY_BUF_SIZE, scanner);
-    ScopeExit free_buffer([&] { yy_delete_buffer(buffer, scanner); });
-    yy_switch_to_buffer(buffer, scanner);
-
-    YYSTYPE yylval;
-    YYLTYPE yylloc;
-    while (int token = yylex(&yylval, &yylloc, scanner))
-        print_token(token);
-    return {};
-}

@@ -1,65 +1,31 @@
+#include <minijava/ast/graphviz.hpp>
 #include <minijava/parser/parser.hpp>
 
-enum struct Command {
-    Scan,
-    Parse,
-};
+#include <fmt/format.h>
 
-static constexpr std::pair<std::string_view, Command> CommandMap[] = {
-    {"scan", Command::Scan},
-    {"parse", Command::Parse},
-};
+using namespace minijava;
 
 int main(int argc, const char** argv)
 {
-    if (argc != 3) {
-        std::fprintf(stderr, "Usage: %s COMMAND FILE\n", argv[0]);
-        return -1;
+    if (argc != 2) {
+        fmt::print(stderr, "Usage: {} FILE\n", argv[0]);
+        return EXIT_FAILURE;
     }
 
-    Command command;
-    {
-        auto* it = std::find_if(std::begin(CommandMap), std::end(CommandMap),
-                                [&](auto& e) { return e.first == argv[1]; });
-        if (it == std::end(CommandMap)) {
-            std::fprintf(stderr,
-                         "Invalid command: %s.\n"
-                         "Valid commands: scan parse.\n",
-                         argv[1]);
-            return -2;
-        }
-        command = it->second;
-    }
-
-    const char* filename = argv[2];
+    const char* filename = argv[1];
     FILE* file = std::fopen(filename, "r");
     if (file == nullptr) {
-        std::fprintf(stderr, "Unable to open file %s\n", filename);
-        return -3;
+        fmt::print(stderr, "Unable to open file {}\n", filename);
+        return EXIT_FAILURE;
     }
 
-    std::error_code error;
-    switch (command) {
-    case Command::Scan: {
-        error = minijava::print_tokens(file);
-        break;
-    }
-    case Command::Parse: {
-        minijava::AstTree tree;
-        error = minijava::parse(file, &tree);
-        auto class_count = tree.classes.size();
-        if (!error) {
-            std::printf("Parsed successfully, "
-                        "%zu class%s in file\n",
-                        class_count, (class_count == 1) ? "" : "es");
-        }
-        break;
-    }
+    AstTree tree;
+    auto error = parse(file, &tree);
+    if (error) {
+        fmt::print(stderr, "Error: {}\n", error.message());
+        return EXIT_FAILURE;
     }
 
-    if (!error)
-        return 0;
-
-    std::fprintf(stderr, "%s\n", error.message().c_str());
-    return 1;
+    print_ast(tree);
+    return EXIT_SUCCESS;
 }

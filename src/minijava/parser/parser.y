@@ -6,6 +6,8 @@
 #include <parser_impl.hpp>
 #include <lexer_impl.hpp>
 
+#include <fmt/format.h>
+
 using namespace minijava;
 
 template <typename T>
@@ -22,7 +24,6 @@ static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*, const char* msg);
 %define api.token.prefix {TOK_}
 %define parse.error verbose
 %locations
-%token-table
 
 %param {yyscan_t scanner}
 %parse-param {minijava::AstTree* tree}
@@ -305,11 +306,6 @@ static void move_array(GCArray<T>& to, GCArray<T>& from)
 
 static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*, const char* msg)
 {
-    std::fprintf(stderr, "%d:%d: %s\n",
-                 yyllocp->first_line, yyllocp->first_column, msg);
-}
-
-void print_token(int token)
-{
-    std::puts(yytname[YYTRANSLATE(token)]);
+    fmt::print(stderr, "{}:{}: {}\n",
+               yyllocp->first_line, yyllocp->first_column, msg);
 }

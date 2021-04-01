@@ -31,11 +31,13 @@ add_executable(
         minijava
         main.cpp
         utility.cpp
+        ast/graphviz.cpp
         parser/parser.cpp
         ${FLEX_FlexLexer_OUTPUTS}
         ${BISON_BisonParser_OUTPUTS})
 
 target_include_directories(minijava PRIVATE ${PROJECT_BINARY_DIR})
+target_link_libraries(minijava PRIVATE fmt::fmt)
 
 if (CMAKE_COMPILER_IS_GNUCC)
     target_compile_options(minijava PRIVATE "-Wall" "-Wextra" "-Wno-missing-braces")
@@ -47,8 +49,6 @@ endif()
 file(GLOB test_samples "${PROJECT_SOURCE_DIR}/tests/*")
 foreach(file ${test_samples})
     get_filename_component(fname ${file} NAME)
-    add_test(NAME Scan_${fname}
-             COMMAND ${PROJECT_BINARY_DIR}/minijava scan ${file})
     add_test(NAME Parse_${fname}
-             COMMAND ${PROJECT_BINARY_DIR}/minijava parse ${file})
+             COMMAND ${PROJECT_BINARY_DIR}/minijava ${file})
 endforeach(file ${test_samples})
