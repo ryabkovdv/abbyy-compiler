@@ -1,5 +1,4 @@
 #include <minijava/typecheck/typecheck.hpp>
-#include <unordered_map>
 
 using namespace minijava;
 
@@ -42,17 +41,17 @@ public:
 
     const Type* visitIfStmt(const IfStmt& node)
     {
-        auto* cond_type = visit(node.condition);
+        auto* cond_type = visit(node.cond);
         verify_same(cond_type, &BoolType);
 
-        visit(node.if_branch);
+        visit(node.then_branch);
         visit(node.else_branch);
         return nullptr;
     }
 
     const Type* visitWhileStmt(const WhileStmt& node)
     {
-        auto* cond_type = visit(node.condition);
+        auto* cond_type = visit(node.cond);
         verify_same(cond_type, &BoolType);
 
         visit(node.body);
@@ -68,16 +67,16 @@ public:
 
     const Type* visitPrintStmt(const PrintStmt& node)
     {
-        visit(node.arguments);
+        visit(node.args);
         return nullptr;
     }
 
     const Type* visitAssignStmt(const AssignStmt& node)
     {
-        auto* lhs_type = visit(node.target);
-        auto* rhs_type = visit(node.value);
+        auto* lhs_type = visit(node.lhs);
+        auto* rhs_type = visit(node.rhs);
 
-        if (is_lvalue(node.target)) {
+        if (is_lvalue(node.lhs)) {
             verify_convertible(rhs_type, lhs_type);
         } else {
             // emit error
@@ -131,7 +130,7 @@ public:
         if (signature == nullptr) {
         }
 
-        auto args = node.arguments;
+        auto args = node.args;
         auto params = signature->parameters;
         if (args.size() != params.size()) {
         }
@@ -192,11 +191,9 @@ private:
     const ClassType* m_class = nullptr;
     DiagnosticEngine* m_diag;
 
-    std::unordered_map<std::string_view, 
-
-    const Type* lookup_type(std::string_view);
-    const Type* lookup_variable(std::string_view);
-    const Signature* lookup_method(const Type*, std::string_view);
+    const Type* lookup_type(Symbol);
+    const Type* lookup_variable(Symbol);
+    const Signature* lookup_method(const Type*, Symbol);
 
     static void verify_same(const Type* x, const Type* y) noexcept
     {
