@@ -24,6 +24,12 @@
 
 namespace minijava {
 
+template <typename...>
+using int_t = int;
+
+template <bool Cond>
+using int_if_t = std::enable_if_t<Cond, int>;
+
 [[noreturn]]
 inline void unreachable(const char* msg)
 {
@@ -141,14 +147,14 @@ public:
     constexpr Span(T* first, T* last) noexcept : m_begin(first), m_end(last)
     {}
 
-    template <typename R, typename = std::void_t<
+    template <typename R, int_t<
         std::enable_if_t<!std::is_same_v<R, Span>>,
         decltype(std::data(std::declval<R>())),
         decltype(std::size(std::declval<R>())),
         std::enable_if_t<std::is_convertible_v<
             std::remove_pointer_t<decltype(std::data(std::declval<R&>()))> (*)[],
             T (*)[]
-        >>>>
+        >>> = 0>
     constexpr Span(R&& range) noexcept
         : m_begin(std::data(range)), m_end(m_begin + std::size(range))
     {}
@@ -349,6 +355,55 @@ private:
     }();
 };
 
+class Symbol {
+public:
+    Symbol() = default;
+
+    template <typename... Args,
+              int_if_t<std::is_constructible_v<std::string_view, Args...>> = 0>
+    explicit Symbol(BumpAllocator& pool, Args&&... args)
+    {
+        std::string_view str(std::forward<Args>(args)...);
+        assert(!str.empty() && "cannot create symbol from empty string");
+
+        void* ptr = pool.allocate(sizeof(Symbol::Value) + str.size(),
+                                  alignof(Symbol::Value));
+        auto* data = static_cast<char*>(ptr) + sizeof(Symbol::Value);
+        std::memcpy(data, str.data(), str.size());
+        m_value = ::new (ptr) Symbol::Value{uint32_t(str.size())};
+    }
+
+    bool empty() const noexcept
+    {
+        return m_value == nullptr;
+    }
+
+    std::string_view to_view() const noexcept
+    {
+        return std::string_view(reinterpret_cast<const char*>(m_value + 1),
+                                m_value->len);
+    }
+
+    friend bool operator==(Symbol lhs, Symbol rhs) noexcept
+    {
+        return lhs.m_value == rhs.m_value;
+    }
+
+    friend bool operator!=(Symbol lhs, Symbol rhs) noexcept
+    {
+        return lhs.m_value != rhs.m_value;
+    }
+
+private:
+    struct Value {
+        uint32_t len;
+    };
+
+    const Value* m_value = nullptr;
+
+    friend struct std::hash<Symbol>;
+};
+
 template <typename... Args>
 auto dup_string(BumpAllocator& pool, Args&&... args)
     -> decltype(std::string_view(std::forward<Args>(args)...))
@@ -421,6 +476,14 @@ constexpr auto dyn_cast(From* from) -> copy_cv_t<To, From>*
 }
 
 } // namespace minijava
+
+template <>
+struct std::hash<minijava::Symbol> {
+    size_t operator()(minijava::Symbol symbol) const noexcept
+    {
+        return std::hash<const void*>{}(symbol.m_value);
+    }
+};
 
 [[nodiscard]]
 inline void* operator new(size_t size, std::align_val_t alignment,

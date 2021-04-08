@@ -12,17 +12,16 @@ struct MethodDecl : ClassRecord {
     };
 
     Access access;
-    std::string_view name;
-    std::string_view type;
+    Symbol name;
+    Symbol ret_type;
     Span<Parameter> parameters;
     Span<const Stmt*> body;
 
-    explicit constexpr MethodDecl(Access access, std::string_view name,
-                                  std::string_view type,
+    explicit constexpr MethodDecl(Access access, Symbol name, Symbol ret_type,
                                   Span<Parameter> parameters,
                                   Span<const Stmt*> body)
         : ClassRecord{ClassRecord::MethodDecl}, access(access), name(name),
-          type(type), parameters(parameters), body(body)
+          ret_type(ret_type), parameters(parameters), body(body)
     {}
 
     static constexpr bool classof(const ClassRecord& record)
@@ -44,6 +43,19 @@ struct ThisExpr : Expr {
 };
 
 inline const ThisExpr ThisExpr::Instance{};
+
+struct IntLiteral : Expr {
+    std::string_view value;
+
+    explicit constexpr IntLiteral(std::string_view value)
+        : Expr{Stmt::IntLiteral}, value(value)
+    {}
+
+    static constexpr bool classof(const Stmt& record)
+    {
+        return record.kind == Stmt::IntLiteral;
+    }
+};
 
 struct BoolLiteral : Expr {
     static const BoolLiteral True;
@@ -72,7 +84,8 @@ struct AstTree {
 };
 
 template <typename V, typename RetT = void, typename TreeRetT = void>
-struct AstVisitor : detail::AstVisitorImpl<V, RetT> {
+class AstVisitor : public detail::AstVisitorImpl<V, RetT> {
+public:
     using detail::AstVisitorImpl<V, RetT>::visit;
 
     constexpr TreeRetT visit(const AstTree* tree)

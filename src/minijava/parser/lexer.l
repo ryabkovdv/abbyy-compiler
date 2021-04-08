@@ -2,16 +2,14 @@
 #define YY_EXTRA_TYPE minijava::BumpAllocator*
 #include <parser_impl.hpp>
 
+#define YY_USER_INIT yylineno = yycolumn = 1;
+
 #define YY_USER_ACTION                                                         \
     {                                                                          \
-        yylloc->first_line = yylloc->last_line;                                \
-        yylloc->first_column = yylloc->last_column;                            \
-        if (yylloc->last_line == yylineno) {                                   \
-            yylloc->last_column += yyleng;                                     \
-        } else {                                                               \
-            yylloc->last_line = yylineno;                                      \
-            yylloc->last_column = yytext + yyleng - strrchr(yytext, '\n');     \
-        }                                                                      \
+        yylloc->first_line = yylloc->last_line = yylineno;                     \
+        yylloc->first_column = yycolumn;                                       \
+        yylloc->last_column = yycolumn + yyleng - 1;                           \
+        yycolumn += yyleng;                                                    \
     }
 
 using namespace minijava;
@@ -20,7 +18,6 @@ using namespace minijava;
 %option 8bit reentrant never-interactive bison-bridge bison-locations
 %option warn noinput nounput noyywrap nodefault yylineno
 
-SPACE [\t\n\v\f\r ]+
 NUMBER [0-9]+
 IDENT [A-Za-z_][0-9A-Za-z_]*
 PRINT System\.out\.println
@@ -28,8 +25,10 @@ COMMENT \/\/[^\n]*
 
 %%
 
-{SPACE}         {}
 {COMMENT}       {}
+[\r ]+          {}
+"\t"            { yycolumn += 7; }
+"\n"            { yycolumn = 1; }
 
 "boolean"       { return TOK_BOOL; }
 "class"         { return TOK_CLASS; }
@@ -83,7 +82,7 @@ COMMENT \/\/[^\n]*
                 }
 
 {IDENT}         {
-                    yylval->string = dup_string(*yyextra, yytext, yyleng);
+                    yylval->symbol = Symbol(*yyextra, yytext, yyleng);
                     return TOK_IDENT;
                 }
 

@@ -31,6 +31,7 @@ add_executable(
         minijava
         main.cpp
         utility.cpp
+        diagnostic.cpp
         ast/graphviz.cpp
         parser/parser.cpp
         ${FLEX_FlexLexer_OUTPUTS}

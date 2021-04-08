@@ -16,7 +16,7 @@ $definitions
 namespace detail {
 
 template <typename V, typename RetT>
-struct AstVisitorImpl {
+class AstVisitorImpl {
 private:
     template <typename To, typename From, typename Dummy = V>
     static constexpr To incomplete_cast(From&& from)
@@ -299,8 +299,8 @@ def parse_type(field_type):
             raise ValueError(f"invalid field type: {field_type}")
         subtype = parse_type(field_type[2:])
         return f"Span<{subtype} const>"
-    if field_type == "string":
-        return "std::string_view"
+    if field_type == "symbol":
+        return "Symbol"
     # TODO: check if field_type is valid
     return f"const {field_type}*"
 

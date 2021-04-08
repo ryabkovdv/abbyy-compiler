@@ -1,0 +1,9 @@
+#ifndef MINIJAVA_TYPECHECK_TYPECHECK_HPP
+#define MINIJAVA_TYPECHECK_TYPECHECK_HPP
+
+#include <minijava/diagnostic.hpp>
+
+#include <minijava/ast/ast.hpp>
+#include <minijava/typecheck/type.hpp>
+
+#endif

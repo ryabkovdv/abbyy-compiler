@@ -1,12 +1,12 @@
 %{
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+
 #define POOL (tree->pool)
 #define YY_EXTRA_TYPE minijava::BumpAllocator*
-#pragma GCC diagnostic ignored "-Wclass-memaccess"
 
 #include <parser_impl.hpp>
 #include <lexer_impl.hpp>
-
-#include <fmt/format.h>
 
 using namespace minijava;
 
@@ -16,7 +16,8 @@ static void init_array(GCArray<T>& array, BumpAllocator& pool);
 template <typename T>
 static void move_array(GCArray<T>& to, GCArray<T>& from);
 
-static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*, const char* msg);
+static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*,
+                    DiagnosticEngine& diag, const char* msg);
 %}
 
 %define api.pure full
@@ -27,9 +28,16 @@ static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*, const char* msg);
 
 %param {yyscan_t scanner}
 %parse-param {minijava::AstTree* tree}
+%parse-param {minijava::DiagnosticEngine& diag}
+
+%initial-action { @$ = {1, 1, 1, 1}; }
 
 %code requires {
+#include <minijava/diagnostic.hpp>
+
 #include <minijava/ast/ast.hpp>
+
+#define YYLTYPE minijava::Location
 
 using yyscan_t = void*;
 
@@ -52,6 +60,7 @@ union YYSTYPE {
 
     MethodDecl::Access access;
     std::string_view string;
+    Symbol symbol;
     const Expr* expr;
     const Stmt* stmt;
     const ClassDecl* class_decl;
@@ -59,8 +68,8 @@ union YYSTYPE {
     GCArray<const ClassDecl*> classes;
     GCArray<const ClassRecord*> class_records;
     GCArray<const Stmt*> statements;
-    GCArray<Parameter> parameters;
-    GCArray<const Expr*> arguments;
+    GCArray<Parameter> params;
+    GCArray<const Expr*> args;
 };
 } // namespace minijava
 }
@@ -113,7 +122,8 @@ union YYSTYPE {
 %token SEMICOLON        ";"
 
 %type<access> Access
-%type<string> IDENT NUMBER BaseClass Type
+%type<string> NUMBER
+%type<symbol> IDENT BaseClass Type
 %type<expr> Expression PrimaryExpression
 %type<stmt> Statement
 %type<class_decl> ClassDeclaration
@@ -121,8 +131,8 @@ union YYSTYPE {
 %type<classes> Classes
 %type<class_records> ClassRecords
 %type<statements> Statements Main
-%type<parameters> Parameters ParameterList
-%type<arguments> Arguments ArgumentList
+%type<params> Parameters ParameterList
+%type<args> Arguments ArgumentList
 
 %left "||"
 %left "&&"
@@ -141,8 +151,8 @@ Main
     : "class" IDENT "{" "public" "static" "void" IDENT[name]
       "(" "String" "[" "]" IDENT ")" "{" Statement[body] "}" "}"
         {
-            if ($name != "main") {
-                yyerror(&@name, scanner, tree,
+            if ($name.to_view() != "main") {
+                yyerror(&@name, scanner, tree, diag,
                         "entrypoint must be called `main'");
                 YYERROR;
             }
@@ -169,9 +179,9 @@ Access
     | "private" { $$ = MethodDecl::Private; }
 
 Type
-    : "boolean" { $$ = "bool"; }
-    | "int" { $$ = "int"; }
-    | "int" "[" "]" { $$ = "int[]"; }
+    : "boolean" { $$ = Symbol(POOL, "bool"); }
+    | "int" { $$ = Symbol(POOL, "int"); }
+    | "int" "[" "]" { $$ = Symbol(POOL, "int[]"); }
     | IDENT[name] { $$ = $name; }
 
 Statement
@@ -179,9 +189,9 @@ Statement
         { $$ = new(POOL) VarDecl($name, $type); }
     | "{" Statements[body] "}"
         { $$ = new(POOL) CompoundStmt($body); }
-    | "if" "(" Expression[cond] ")" Statement[if_branch]
+    | "if" "(" Expression[cond] ")" Statement[then_branch]
       "else" Statement[else_branch]
-        { $$ = new(POOL) IfStmt($cond, $if_branch, $else_branch); }
+        { $$ = new(POOL) IfStmt($cond, $then_branch, $else_branch); }
     | "while" "(" Expression[cond] ")" Statement[body]
         { $$ = new(POOL) WhileStmt($cond, $body); }
     | "return" Expression[expr] ";"
@@ -190,39 +200,39 @@ Statement
         { $$ = new(POOL) PrintStmt($args); }
     | Expression[expr] ";"
         { $$ = $expr; }
-    | Expression[target] "=" Expression[value] ";"
-        { $$ = new(POOL) AssignStmt($target, $value); }
+    | Expression[lhs] "=" Expression[rhs] ";"
+        { $$ = new(POOL) AssignStmt($lhs, $rhs); }
 
 Expression
     : PrimaryExpression
     | "!" Expression[expr]
         { $$ = new(POOL) NotExpr($expr); }
-    | Expression[left] "*" Expression[right]
-        { $$ = new(POOL) MulExpr($left, $right); }
-    | Expression[left] "/" Expression[right]
-        { $$ = new(POOL) DivExpr($left, $right); }
-    | Expression[left] "%" Expression[right]
-        { $$ = new(POOL) RemExpr($left, $right); }
-    | Expression[left] "+" Expression[right]
-        { $$ = new(POOL) AddExpr($left, $right); }
-    | Expression[left] "-" Expression[right]
-        { $$ = new(POOL) SubExpr($left, $right); }
-    | Expression[left] "!=" Expression[right]
-        { $$ = new(POOL) NeExpr($left, $right); }
-    | Expression[left] "==" Expression[right]
-        { $$ = new(POOL) EqExpr($left, $right); }
-    | Expression[left] "<" Expression[right]
-        { $$ = new(POOL) LtExpr($left, $right); }
-    | Expression[left] "<=" Expression[right]
-        { $$ = new(POOL) LeExpr($left, $right); }
-    | Expression[left] ">" Expression[right]
-        { $$ = new(POOL) GtExpr($left, $right); }
-    | Expression[left] ">=" Expression[right]
-        { $$ = new(POOL) GeExpr($left, $right); }
-    | Expression[left] "&&" Expression[right]
-        { $$ = new(POOL) AndExpr($left, $right); }
-    | Expression[left] "||" Expression[right]
-        { $$ = new(POOL) OrExpr($left, $right); }
+    | Expression[lhs] "*" Expression[rhs]
+        { $$ = new(POOL) MulExpr($lhs, $rhs); }
+    | Expression[lhs] "/" Expression[rhs]
+        { $$ = new(POOL) DivExpr($lhs, $rhs); }
+    | Expression[lhs] "%" Expression[rhs]
+        { $$ = new(POOL) RemExpr($lhs, $rhs); }
+    | Expression[lhs] "+" Expression[rhs]
+        { $$ = new(POOL) AddExpr($lhs, $rhs); }
+    | Expression[lhs] "-" Expression[rhs]
+        { $$ = new(POOL) SubExpr($lhs, $rhs); }
+    | Expression[lhs] "!=" Expression[rhs]
+        { $$ = new(POOL) NeExpr($lhs, $rhs); }
+    | Expression[lhs] "==" Expression[rhs]
+        { $$ = new(POOL) EqExpr($lhs, $rhs); }
+    | Expression[lhs] "<" Expression[rhs]
+        { $$ = new(POOL) LtExpr($lhs, $rhs); }
+    | Expression[lhs] "<=" Expression[rhs]
+        { $$ = new(POOL) LeExpr($lhs, $rhs); }
+    | Expression[lhs] ">" Expression[rhs]
+        { $$ = new(POOL) GtExpr($lhs, $rhs); }
+    | Expression[lhs] ">=" Expression[rhs]
+        { $$ = new(POOL) GeExpr($lhs, $rhs); }
+    | Expression[lhs] "&&" Expression[rhs]
+        { $$ = new(POOL) AndExpr($lhs, $rhs); }
+    | Expression[lhs] "||" Expression[rhs]
+        { $$ = new(POOL) OrExpr($lhs, $rhs); }
 
 PrimaryExpression
     : IDENT
@@ -247,8 +257,8 @@ PrimaryExpression
         { $$ = new(POOL) CallExpr($object, $name, $args); }
     | PrimaryExpression[object] "." IDENT[name]
         {
-            if ($name != "length") {
-                yyerror(&@name, scanner, tree,
+            if ($name.to_view() != "length") {
+                yyerror(&@name, scanner, tree, diag,
                         "only `length' property is supported");
                 YYERROR;
             }
@@ -304,8 +314,8 @@ static void move_array(GCArray<T>& to, GCArray<T>& from)
     ::new(&to) GCArray<T>(std::move(from));
 }
 
-static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*, const char* msg)
+static void yyerror(YYLTYPE* yyllocp, yyscan_t, AstTree*,
+                    DiagnosticEngine& diag, const char* msg)
 {
-    fmt::print(stderr, "{}:{}: {}\n",
-               yyllocp->first_line, yyllocp->first_column, msg);
+    diag.error(*yyllocp, "{}", msg);
 }

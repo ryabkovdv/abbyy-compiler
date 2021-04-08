@@ -1,20 +1,20 @@
 {
     "Parameter": {
-        "name": "string",
-        "type": "string"
+        "name": "symbol",
+        "type": "symbol"
     },
 
     "ClassDecl": {
-        "name": "string",
-        "base": "string",
+        "name": "symbol",
+        "base": "symbol",
         "records": "[]ClassRecord"
     },
 
     "ClassRecord": {},
     "ClassVarDecl": {
         "<base>": "ClassRecord",
-        "name": "string",
-        "type": "string"
+        "name": "symbol",
+        "type": "symbol"
     },
     "MethodDecl": {
         "<extern base>": "ClassRecord"
@@ -23,8 +23,8 @@
     "Stmt": {},
     "VarDecl": {
         "<base>": "Stmt",
-        "name": "string",
-        "type": "string"
+        "name": "symbol",
+        "type": "symbol"
     },
     "CompoundStmt": {
         "<base>": "Stmt",
@@ -32,13 +32,13 @@
     },
     "IfStmt": {
         "<base>": "Stmt",
-        "condition": "Expr",
-        "if_branch": "Stmt",
+        "cond": "Expr",
+        "then_branch": "Stmt",
         "else_branch": "Stmt"
     },
     "WhileStmt": {
         "<base>": "Stmt",
-        "condition": "Expr",
+        "cond": "Expr",
         "body": "Stmt"
     },
     "ReturnStmt": {
@@ -47,12 +47,12 @@
     },
     "PrintStmt": {
         "<base>": "Stmt",
-        "arguments": "[]Expr"
+        "args": "[]Expr"
     },
     "AssignStmt": {
         "<base>": "Stmt",
-        "target": "Expr",
-        "value": "Expr"
+        "lhs": "Expr",
+        "rhs": "Expr"
     },
 
     "Expr": {
@@ -89,8 +89,8 @@
     "CallExpr": {
         "<base>": "Expr",
         "object": "Expr",
-        "name": "string",
-        "arguments": "[]Expr"
+        "name": "symbol",
+        "args": "[]Expr"
     },
     "LengthExpr": {
         "<base>": "Expr",
@@ -102,17 +102,16 @@
     },
     "NewObjectExpr": {
         "<base>": "Expr",
-        "name": "string"
+        "name": "symbol"
     },
     "IdentExpr": {
         "<base>": "Expr",
-        "name": "string"
-    },
-    "IntLiteral": {
-        "<base>": "Expr",
-        "value": "string"
+        "name": "symbol"
     },
     "ThisExpr": {
+        "<extern base>": "Expr"
+    },
+    "IntLiteral": {
         "<extern base>": "Expr"
     },
     "BoolLiteral": {
