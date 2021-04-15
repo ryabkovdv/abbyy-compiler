@@ -15,11 +15,11 @@ struct MethodDecl : ClassRecord {
     Symbol name;
     Symbol ret_type;
     Span<Parameter> parameters;
-    Span<const Stmt*> body;
+    Span<Stmt const* const> body;
 
     explicit constexpr MethodDecl(Access access, Symbol name, Symbol ret_type,
                                   Span<Parameter> parameters,
-                                  Span<const Stmt*> body)
+                                  Span<Stmt const* const> body)
         : ClassRecord{ClassRecord::MethodDecl}, access(access), name(name),
           ret_type(ret_type), parameters(parameters), body(body)
     {}
@@ -77,7 +77,7 @@ inline const BoolLiteral BoolLiteral::True{true};
 inline const BoolLiteral BoolLiteral::False{false};
 
 struct AstTree {
-    Span<const ClassDecl*> classes;
+    Span<ClassDecl const* const> classes;
     const Stmt* main;
 
     BumpAllocator pool;
@@ -99,15 +99,7 @@ public:
     }
 
     constexpr void visitTree(const AstTree& tree)
-    {
-        static_cast<V*>(this)->visitMain(*tree.main);
-        visit(tree.classes);
-    }
-
-    constexpr void visitMain(const Stmt& main)
-    {
-        (void)visit(main);
-    }
+    {}
 };
 
 } // namespace minijava

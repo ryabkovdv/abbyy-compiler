@@ -1,8 +1,9 @@
-#define YY_EXTRA_TYPE minijava::BumpAllocator*
+#include <minijava/parser/parser.hpp>
+
+#define YY_EXTRA_TYPE minijava::detail::yy_extra_type*
+#include <minijava/parser/yyextra.hpp>
 #include <parser_impl.hpp>
 #include <lexer_impl.hpp>
-
-#include <minijava/parser/parser.hpp>
 
 using namespace minijava;
 
@@ -52,7 +53,8 @@ std::error_code
 minijava::parse(std::string_view content, DiagnosticEngine& diag, AstTree* tree)
 {
     yyscan_t scanner;
-    if (yylex_init_extra(&tree->pool, &scanner) != 0)
+    detail::yy_extra_type yyextra_val{{}, &tree->pool};
+    if (yylex_init_extra(&yyextra_val, &scanner) != 0)
         return ParseError::InitFailure;
     ScopeExit free_scanner([&] { yylex_destroy(scanner); });
 
@@ -69,9 +71,10 @@ minijava::parse(std::string_view content, DiagnosticEngine& diag, AstTree* tree)
 std::error_code
 minijava::print_tokens(std::string_view content, DiagnosticEngine& diag)
 {
-    BumpAllocator pool;
     yyscan_t scanner;
-    if (yylex_init_extra(&pool, &scanner) != 0)
+    BumpAllocator pool;
+    detail::yy_extra_type yyextra_val{{}, &pool};
+    if (yylex_init_extra(&yyextra_val, &scanner) != 0)
         return ParseError::InitFailure;
     ScopeExit free_scanner([&] { yylex_destroy(scanner); });
 

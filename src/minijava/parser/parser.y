@@ -1,12 +1,13 @@
 %{
-#pragma GCC diagnostic ignored "-Wclass-memaccess"
-#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
-
 #define POOL (tree->pool)
-#define YY_EXTRA_TYPE minijava::BumpAllocator*
+#define YY_EXTRA_TYPE minijava::detail::yy_extra_type*
 
+#include <minijava/parser/yyextra.hpp>
 #include <parser_impl.hpp>
 #include <lexer_impl.hpp>
+
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
 
 using namespace minijava;
 

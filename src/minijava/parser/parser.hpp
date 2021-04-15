@@ -1,9 +1,9 @@
 #ifndef MINIJAVA_PARSER_PARSER_HPP
 #define MINIJAVA_PARSER_PARSER_HPP
 
-#include <minijava/diagnostic.hpp>
-
 #include <minijava/ast/ast.hpp>
+
+#include <minijava/diagnostic.hpp>
 
 namespace minijava {
 

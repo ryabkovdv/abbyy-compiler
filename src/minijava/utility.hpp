@@ -375,7 +375,7 @@ public:
 
     bool empty() const noexcept
     {
-        return m_value == nullptr;
+        return m_value == &EmptyValue;
     }
 
     std::string_view to_view() const noexcept
@@ -389,9 +389,29 @@ public:
         return lhs.m_value == rhs.m_value;
     }
 
+    friend bool operator==(Symbol lhs, std::string_view rhs) noexcept
+    {
+        return lhs.to_view() == rhs;
+    }
+
+    friend bool operator==(std::string_view lhs, Symbol rhs) noexcept
+    {
+        return lhs == rhs.to_view();
+    }
+
     friend bool operator!=(Symbol lhs, Symbol rhs) noexcept
     {
-        return lhs.m_value != rhs.m_value;
+        return !(lhs == rhs);
+    }
+
+    friend bool operator!=(Symbol lhs, std::string_view rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    friend bool operator!=(std::string_view lhs, Symbol rhs) noexcept
+    {
+        return !(lhs == rhs);
     }
 
 private:
@@ -399,7 +419,9 @@ private:
         uint32_t len;
     };
 
-    const Value* m_value = nullptr;
+    static constexpr Value EmptyValue{0};
+
+    const Value* m_value = &EmptyValue;
 
     friend struct std::hash<Symbol>;
 };

@@ -5,7 +5,7 @@ namespace minijava {
 
 struct Type {
     enum Kind : int {
-        Void,
+        Null,
         Bool,
         Int,
         IntArray,
@@ -22,7 +22,7 @@ struct ClassType : Type {
     }
 };
 
-inline constexpr Type VoidType = Type{Type::Void};
+inline constexpr Type NullType = Type{Type::Null};
 inline constexpr Type BoolType = Type{Type::Bool};
 inline constexpr Type IntType = Type{Type::Int};
 inline constexpr Type IntArrayType = Type{Type::IntArray};

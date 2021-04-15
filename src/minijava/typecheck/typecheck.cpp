@@ -11,6 +11,35 @@ static bool is_lvalue(const Expr* expr) noexcept
     return false;
 }
 
+static bool is_same(const Type* x, const Type* y) noexcept
+{
+    if (x == y)
+        return true;
+    if (x == nullptr || y == nullptr)
+        return true;
+    return false;
+}
+
+static bool is_convertible(const Type* from, const Type* to) noexcept
+{
+    if (from == to)
+        return true;
+
+    if (from == nullptr || to == nullptr)
+        return true;
+
+    if (auto* cl_to = dyn_cast<ClassType>(to)) {
+        auto* cl_from = dyn_cast<ClassType>(from);
+        while (cl_from != nullptr) {
+            if (cl_from == cl_to)
+                return true;
+            cl_from = cl_from->base;
+        }
+        return from->kind == Type::Null;
+    }
+    return false;
+}
+
 namespace {
 
 struct Signature {
@@ -89,19 +118,45 @@ public:
         auto* lhs_type = visit(node.lhs);
         auto* rhs_type = visit(node.rhs);
 
-        const Type* target_type = [&] {
-            switch (node.kind) {
-            case BinaryExpr::AndExpr:
-            case BinaryExpr::OrExpr:
-                return &BoolType;
-            default:
-                return &IntType;
+        if (isa<EqExpr>(node) || isa<NeExpr>(node)) {
+            if (!is_convertible(lhs_type, rhs_type) &&
+                !is_convertible(rhs_type, lhs_type)) {
+                // emit error
             }
-        }();
+            return &BoolType;
+        }
+
+        const Type* target_type;
+        const Type* ret_type;
+
+        switch (node.kind) {
+        case BinaryExpr::MulExpr:
+        case BinaryExpr::DivExpr:
+        case BinaryExpr::RemExpr:
+        case BinaryExpr::AddExpr:
+        case BinaryExpr::SubExpr:
+            target_type = &IntType;
+            ret_type = &IntType;
+            break;
+        case BinaryExpr::LtExpr:
+        case BinaryExpr::LeExpr:
+        case BinaryExpr::GtExpr:
+        case BinaryExpr::GeExpr:
+            target_type = &IntType;
+            ret_type = &BoolType;
+            break;
+        case BinaryExpr::AndExpr:
+        case BinaryExpr::OrExpr:
+            target_type = &BoolType;
+            ret_type = &BoolType;
+            break;
+        default:
+            unreachable("invalid binary operation");
+        }
 
         verify_same(lhs_type, target_type);
         verify_same(rhs_type, target_type);
-        return target_type;
+        return ret_type;
     }
 
     const Type* visitNotExpr(const NotExpr& node)
@@ -187,7 +242,7 @@ public:
     }
 
 private:
-    const Type* m_ret_type = &VoidType;
+    const Type* m_ret_type = nullptr;
     const ClassType* m_class = nullptr;
     DiagnosticEngine* m_diag;
 
@@ -221,6 +276,8 @@ private:
                     return;
                 cl_from = cl_from->base;
             }
+            if (from->kind == Type::Null)
+                return;
         }
 
         // not convertible

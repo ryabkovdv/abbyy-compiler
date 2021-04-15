@@ -1,5 +1,6 @@
 %{
-#define YY_EXTRA_TYPE minijava::BumpAllocator*
+#define YY_EXTRA_TYPE minijava::detail::yy_extra_type*
+#include <minijava/parser/yyextra.hpp>
 #include <parser_impl.hpp>
 
 #define YY_USER_INIT yylineno = yycolumn = 1;
@@ -77,12 +78,14 @@ COMMENT \/\/[^\n]*
 ";"             { return TOK_SEMICOLON; }
 
 {NUMBER}        {
-                    yylval->string = dup_string(*yyextra, yytext, yyleng);
+                    yylval->string = dup_string(*yyextra->pool, yytext, yyleng);
                     return TOK_NUMBER;
                 }
 
 {IDENT}         {
-                    yylval->symbol = Symbol(*yyextra, yytext, yyleng);
+                    // TODO: remove useless allocation
+                    auto symbol = Symbol(*yyextra->pool, yytext, yyleng);
+                    yylval->symbol = *yyextra->symtab.insert(symbol).first;
                     return TOK_IDENT;
                 }
 
