@@ -1,4 +1,10 @@
 {
+    "<template>": "ast-template.tpp",
+    "<types>": {
+        "string": "std::string_view",
+        "symbol": "Symbol"
+    },
+
     "Parameter": {
         "name": "symbol",
         "type": "symbol"
@@ -77,10 +83,13 @@
     "AndExpr": { "<base>": "BinaryExpr" },
     "OrExpr":  { "<base>": "BinaryExpr" },
 
-    "NotExpr": {
+    "UnaryExpr": {
         "<base>": "Expr",
         "expr": "Expr"
     },
+    "NotExpr": { "<base>": "UnaryExpr" },
+    "NegExpr": { "<base>": "UnaryExpr" },
+
     "SubscriptExpr": {
         "<base>": "Expr",
         "array": "Expr",
@@ -108,13 +117,17 @@
         "<base>": "Expr",
         "name": "symbol"
     },
-    "ThisExpr": {
-        "<extern base>": "Expr"
-    },
     "IntLiteral": {
-        "<extern base>": "Expr"
+        "<base>": "Expr",
+        "value": "string"
     },
     "BoolLiteral": {
+        "<extern base>": "Expr"
+    },
+    "NullExpr": {
+        "<extern base>": "Expr"
+    },
+    "ThisExpr": {
         "<extern base>": "Expr"
     }
 }

@@ -9,7 +9,11 @@ struct fmt::formatter<Symbol> : fmt::formatter<std::string_view> {
     template <typename FormatContext>
     auto format(Symbol symbol, FormatContext& ctx)
     {
-        return fmt::formatter<std::string_view>::format(symbol.to_view(), ctx);
+        fmt::memory_buffer buf;
+        fmt::format_to(buf, "{} ({})", symbol.to_view(),
+                       (const void*)symbol.to_view().data());
+        return fmt::formatter<std::string_view>::format(
+            {buf.data(), buf.size()}, ctx);
     }
 };
 
@@ -58,11 +62,11 @@ public:
         int id = m_id++;
         std::string_view access =
             (node.access == MethodDecl::Public) ? "public" : "private";
-        print(R"({}[label="{{MethodDecl|name: {}|type: {}|access: {}|)"
+        print(R"({}[label="{{MethodDecl|name: {}|ret_type: {}|access: {}|)"
               R"({{<params> params|<body> body}}}}"];)",
               id, node.name, node.ret_type, access);
 
-        print_list(node.parameters, id, "params");
+        print_list(node.params, id, "params");
         print_list(node.body, id, "body");
 
         return id;
@@ -187,10 +191,17 @@ public:
         return id;
     }
 
-    int visitNotExpr(const NotExpr& node)
+    int visitUnaryExpr(const UnaryExpr& node)
     {
+        std::string_view name;
+        switch (node.kind) {
+        case Expr::NotExpr: name = "NotExpr"; break;
+        case Expr::NegExpr: name = "NegExpr"; break;
+        default: unreachable("invalid unary operation");
+        }
+
         int id = m_id++;
-        print(R"({}[label="{{NotExpr|<expr> expr}}"];)", id);
+        print(R"({}[label="{{{}|<expr> expr}}"];)", id, name);
 
         int expr_id = visit(node.expr);
         link(id, expr_id, "expr");
@@ -270,17 +281,24 @@ public:
         return id;
     }
 
-    int visitThisExpr(const ThisExpr&)
-    {
-        int id = m_id++;
-        print(R"({}[label="ThisExpr"];)", id);
-        return id;
-    }
-
     int visitBoolLiteral(const BoolLiteral& node)
     {
         int id = m_id++;
         print(R"({}[label="{{BoolLiteral|value: {}}}"];)", id, node.value);
+        return id;
+    }
+
+    int visitNullExpr(const NullExpr&)
+    {
+        int id = m_id++;
+        print(R"({}[label="NullExpr"];)", id);
+        return id;
+    }
+
+    int visitThisExpr(const ThisExpr&)
+    {
+        int id = m_id++;
+        print(R"({}[label="ThisExpr"];)", id);
         return id;
     }
 

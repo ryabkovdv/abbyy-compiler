@@ -87,6 +87,7 @@ union YYSTYPE {
 %token IF               "if"
 %token INT              "int"
 %token NEW              "new"
+%token NULL             "null"
 %token PRIVATE          "private"
 %token PUBLIC           "public"
 %token RETURN           "return"
@@ -208,6 +209,8 @@ Expression
     : PrimaryExpression
     | "!" Expression[expr]
         { $$ = new(POOL) NotExpr($expr); }
+    | "-" Expression[expr] %prec "!"
+        { $$ = new(POOL) NegExpr($expr); }
     | Expression[lhs] "*" Expression[rhs]
         { $$ = new(POOL) MulExpr($lhs, $rhs); }
     | Expression[lhs] "/" Expression[rhs]
@@ -242,6 +245,8 @@ PrimaryExpression
         { $$ = new(POOL) IntLiteral($1); }
     | "this"
         { $$ = &ThisExpr::Instance; }
+    | "null"
+        { $$ = &NullExpr::Instance; }
     | "true"
         { $$ = &BoolLiteral::True; }
     | "false"

@@ -10,9 +10,6 @@ namespace minijava {
 std::error_code
 parse(std::string_view content, DiagnosticEngine& diag, AstTree* tree);
 
-std::error_code
-print_tokens(std::string_view content, DiagnosticEngine& diag);
-
 } // namespace minijava
 
 #endif

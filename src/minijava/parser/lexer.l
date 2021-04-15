@@ -39,6 +39,7 @@ COMMENT \/\/[^\n]*
 "if"            { return TOK_IF; }
 "int"           { return TOK_INT; }
 "new"           { return TOK_NEW; }
+"null"          { return TOK_NULL; }
 "private"       { return TOK_PRIVATE; }
 "public"        { return TOK_PUBLIC; }
 "return"        { return TOK_RETURN; }

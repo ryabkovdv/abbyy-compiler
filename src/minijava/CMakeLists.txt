@@ -18,9 +18,11 @@ add_custom_command(
                 "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-gen.py"
                 "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast.json"
                 "${PROJECT_BINARY_DIR}/ast_decl.hpp"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/minijava/ast/"
         VERBATIM
         DEPENDS "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-gen.py"
                 "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast.json"
+                "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-template.tpp"
         COMMENT "Generating AST declarations")
 
 set_source_files_properties(

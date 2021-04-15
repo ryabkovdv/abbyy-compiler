@@ -67,26 +67,3 @@ minijava::parse(std::string_view content, DiagnosticEngine& diag, AstTree* tree)
         return ParseError{status};
     return {};
 }
-
-std::error_code
-minijava::print_tokens(std::string_view content, DiagnosticEngine& diag)
-{
-    yyscan_t scanner;
-    BumpAllocator pool;
-    detail::yy_extra_type yyextra_val{{}, &pool};
-    if (yylex_init_extra(&yyextra_val, &scanner) != 0)
-        return ParseError::InitFailure;
-    ScopeExit free_scanner([&] { yylex_destroy(scanner); });
-
-    YY_BUFFER_STATE buffer =
-        yy_scan_bytes(content.data(), content.size(), scanner);
-    ScopeExit free_buffer([&] { yy_delete_buffer(buffer, scanner); });
-    yy_switch_to_buffer(buffer, scanner);
-
-    YYSTYPE yylval;
-    YYLTYPE yylloc = {1, 1, 1, 1};
-    while (int _ = yylex(&yylval, &yylloc, scanner))
-        diag.warn(yylloc, "test");
-
-    return {};
-}

@@ -459,17 +459,24 @@ struct copy_cv<To, const volatile From> {
 template <typename To, typename From>
 using copy_cv_t = typename copy_cv<To, From>::type;
 
+template <typename To, typename From,
+          int_t<decltype(To::classof(std::declval<const From&>()))> = 0>
+constexpr bool do_isa(const From& from, To*) noexcept
+{
+    return To::classof(from);
+}
+
 template <typename To, typename From>
-constexpr bool isa(From& from) noexcept
+constexpr bool isa(const From& from) noexcept
 {
     if constexpr (std::is_base_of_v<To, From>)
         return true;
     else
-        return To::classof(from);
+        return do_isa(from, (To*)nullptr);
 }
 
 template <typename To, typename From>
-constexpr bool isa(From* from) noexcept
+constexpr bool isa(const From* from) noexcept
 {
     assert(from != nullptr);
     return isa<To>(*from);
