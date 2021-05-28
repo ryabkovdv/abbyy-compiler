@@ -23,6 +23,25 @@
 #include <utility>
 
 namespace minijava {
+namespace detail {
+
+template <typename...>
+struct int_t_helper {
+    using type = int;
+};
+
+} // namespace detail
+
+template <typename... Ts>
+using int_t = typename detail::int_t_helper<Ts...>::type;
+
+template <bool Cond>
+using int_if_t = std::enable_if_t<Cond, int>;
+
+template <typename T>
+struct type_tag {
+    using type = T;
+};
 
 [[noreturn]]
 inline void unreachable(const char* msg)
@@ -78,6 +97,7 @@ public:
     [[gnu::malloc, gnu::alloc_size(2), gnu::alloc_align(3)]]
     void* allocate(size_t size, size_t alignment)
     {
+        // return std::malloc(size);
         assert(alignment <= MaxAlign);
         assert(ptrdiff_t(size) >= 0 && "allocation size overflow");
 
@@ -141,14 +161,14 @@ public:
     constexpr Span(T* first, T* last) noexcept : m_begin(first), m_end(last)
     {}
 
-    template <typename R, typename = std::void_t<
+    template <typename R, int_t<
         std::enable_if_t<!std::is_same_v<R, Span>>,
         decltype(std::data(std::declval<R>())),
         decltype(std::size(std::declval<R>())),
         std::enable_if_t<std::is_convertible_v<
             std::remove_pointer_t<decltype(std::data(std::declval<R&>()))> (*)[],
             T (*)[]
-        >>>>
+        >>> = 0>
     constexpr Span(R&& range) noexcept
         : m_begin(std::data(range)), m_end(m_begin + std::size(range))
     {}
@@ -349,6 +369,76 @@ private:
     }();
 };
 
+class Symbol {
+public:
+    Symbol() = default;
+
+    explicit constexpr Symbol(const char* str) noexcept : m_data(str)
+    {
+        assert(str[0] != '\0' && "cannot create symbol from empty string");
+    }
+
+    template <typename... Args,
+              int_if_t<std::is_constructible_v<std::string_view, Args...>> = 0>
+    explicit Symbol(BumpAllocator& pool, Args&&... args)
+    {
+        std::string_view str(std::forward<Args>(args)...);
+        assert(!str.empty() && "cannot create symbol from empty string");
+        assert(std::strlen(str.data()) == str.size() &&
+               "symbol cannot have NUL bytes");
+
+        char* data = static_cast<char*>(pool.allocate(str.size() + 1, 1));
+        std::memcpy(data, str.data(), str.size());
+        data[str.size()] = '\0';
+        m_data = data;
+    }
+
+    constexpr bool empty() const noexcept
+    {
+        return m_data == nullptr;
+    }
+
+    constexpr std::string_view to_view() const noexcept
+    {
+        return std::string_view(m_data);
+    }
+
+    friend bool operator==(Symbol lhs, Symbol rhs) noexcept
+    {
+        return lhs.m_data == rhs.m_data;
+    }
+
+    friend bool operator==(Symbol lhs, std::string_view rhs) noexcept
+    {
+        return lhs.to_view() == rhs;
+    }
+
+    friend bool operator==(std::string_view lhs, Symbol rhs) noexcept
+    {
+        return lhs == rhs.to_view();
+    }
+
+    friend bool operator!=(Symbol lhs, Symbol rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    friend bool operator!=(Symbol lhs, std::string_view rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    friend bool operator!=(std::string_view lhs, Symbol rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+private:
+    const char* m_data = nullptr;
+
+    friend struct std::hash<Symbol>;
+};
+
 template <typename... Args>
 auto dup_string(BumpAllocator& pool, Args&&... args)
     -> decltype(std::string_view(std::forward<Args>(args)...))
@@ -382,17 +472,24 @@ struct copy_cv<To, const volatile From> {
 template <typename To, typename From>
 using copy_cv_t = typename copy_cv<To, From>::type;
 
+template <typename To, typename From,
+          int_t<decltype(To::classof(std::declval<const From&>()))> = 0>
+constexpr bool do_isa(const From& from, type_tag<To>) noexcept
+{
+    return To::classof(from);
+}
+
 template <typename To, typename From>
-constexpr bool isa(From& from) noexcept
+constexpr bool isa(const From& from) noexcept
 {
     if constexpr (std::is_base_of_v<To, From>)
         return true;
     else
-        return To::classof(from);
+        return do_isa(from, type_tag<To>{});
 }
 
 template <typename To, typename From>
-constexpr bool isa(From* from) noexcept
+constexpr bool isa(const From* from) noexcept
 {
     assert(from != nullptr);
     return isa<To>(*from);
@@ -408,6 +505,9 @@ constexpr auto cast(From& from) -> copy_cv_t<To, From>&
 template <typename To, typename From>
 constexpr auto cast(From* from) -> copy_cv_t<To, From>*
 {
+    if (from == nullptr)
+        return nullptr;
+
     assert(isa<To>(from));
     return static_cast<copy_cv_t<To, From>*>(from);
 }
@@ -415,12 +515,20 @@ constexpr auto cast(From* from) -> copy_cv_t<To, From>*
 template <typename To, typename From>
 constexpr auto dyn_cast(From* from) -> copy_cv_t<To, From>*
 {
-    if (!isa<To>(from))
+    if (from == nullptr || !isa<To>(from))
         return nullptr;
     return static_cast<copy_cv_t<To, From>*>(from);
 }
 
 } // namespace minijava
+
+template <>
+struct std::hash<minijava::Symbol> {
+    size_t operator()(minijava::Symbol symbol) const noexcept
+    {
+        return std::hash<const void*>{}(symbol.m_data);
+    }
+};
 
 [[nodiscard]]
 inline void* operator new(size_t size, std::align_val_t alignment,

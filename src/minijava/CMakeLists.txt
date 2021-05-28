@@ -15,12 +15,14 @@ ADD_FLEX_BISON_DEPENDENCY(FlexLexer BisonParser)
 add_custom_command(
         OUTPUT  ${PROJECT_BINARY_DIR}/ast_decl.hpp
         COMMAND ${Python3_EXECUTABLE}
-                "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-gen.py"
+                "${PROJECT_SOURCE_DIR}/src/minijava/node-gen.py"
                 "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast.json"
                 "${PROJECT_BINARY_DIR}/ast_decl.hpp"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/minijava/ast/"
         VERBATIM
-        DEPENDS "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-gen.py"
+        DEPENDS "${PROJECT_SOURCE_DIR}/src/minijava/node-gen.py"
                 "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast.json"
+                "${PROJECT_SOURCE_DIR}/src/minijava/ast/ast-template.tpp"
         COMMENT "Generating AST declarations")
 
 set_source_files_properties(
@@ -31,8 +33,11 @@ add_executable(
         minijava
         main.cpp
         utility.cpp
+        diagnostic.cpp
         ast/graphviz.cpp
         parser/parser.cpp
+        typecheck/typecheck.cpp
+        ir/graphviz.cpp
         ${FLEX_FlexLexer_OUTPUTS}
         ${BISON_BisonParser_OUTPUTS})
 
@@ -49,6 +54,6 @@ endif()
 file(GLOB test_samples "${PROJECT_SOURCE_DIR}/tests/*")
 foreach(file ${test_samples})
     get_filename_component(fname ${file} NAME)
-    add_test(NAME Parse_${fname}
-             COMMAND ${PROJECT_BINARY_DIR}/minijava ${file})
+    add_test(NAME IR_${fname}
+             COMMAND ${PROJECT_BINARY_DIR}/minijava ir ${file})
 endforeach(file ${test_samples})

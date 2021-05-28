@@ -1,46 +1,8 @@
 import json
 import sys
 from io import StringIO
+from itertools import chain
 from string import Template
-
-HEADER = Template("""\
-#ifndef MINIJAVA_AST_DECL_HPP
-#define MINIJAVA_AST_DECL_HPP
-
-#include <minijava/utility.hpp>
-
-namespace minijava {
-
-$declarations
-$definitions
-namespace detail {
-
-template <typename V, typename RetT>
-struct AstVisitorImpl {
-private:
-    template <typename To, typename From, typename Dummy = V>
-    static constexpr To incomplete_cast(From&& from)
-    {
-        return static_cast<To>(from);
-    }
-
-public:
-    template <typename R>
-    constexpr auto visit(const R& range)
-        -> std::void_t<decltype(std::begin(range)), decltype(std::end(range))>
-    {
-        for (const auto& node : range)
-            (void)visit(node);
-    }
-
-$visitors
-};
-
-} // namespace detail
-} // namespace minijava
-
-#endif
-""")
 
 CONSTRUCTOR = Template("""\
     explicit constexpr $name($arguments)
@@ -48,25 +10,25 @@ CONSTRUCTOR = Template("""\
     {}
 """)
 
-CLASSOF_TRUE = Template("""\
-    static constexpr bool classof(const $root& base)
+ISA_TRUE = Template("""\
+    friend constexpr bool do_isa(const $root& base, type_tag<$name>)
     {
         return true;
     }
 """)
 
-CLASSOF_BASE = Template("""\
-    static constexpr bool classof(const $root& base)
+ISA_BASE = Template("""\
+    friend constexpr bool do_isa(const $root& base, type_tag<$name>)
     {
         auto kind = base.kind;
-        return $root::$first <= kind && kind <= $root::$last;
+        return $enum::$first <= kind && kind <= $enum::$last;
     }
 """)
 
-CLASSOF_LEAF = Template("""\
-    static constexpr bool classof(const $root& base)
+ISA_LEAF = Template("""\
+    friend constexpr bool do_isa(const $root& base, type_tag<$name>)
     {
-        return base.kind == $root::$name;
+        return base.kind == $enum::$name;
     }
 """)
 
@@ -77,7 +39,7 @@ VISITOR_DEGENERATE = Template("""\
     }
     constexpr RetT visit(const $root& node)
     {
-        return static_cast<V*>(this)->visit$name($cast<const $name&>(node));
+        return static_cast<V*>(this)->visit$name(static_cast<const $name&>(node));
     }
 """)
 
@@ -89,15 +51,16 @@ VISITOR = Template("""\
     constexpr RetT visit(const $root& node)
     {
         switch (node.kind) {
-$cases
+${cases}
+        default:
+            unreachable("Invalid node kind");
         }
-        unreachable("invalid node kind");
     }
 """)
 
 VISITOR_CASE = Template("""\
-        case $root::$name:
-            return static_cast<V*>(this)->visit$name($cast<const $name&>(node));
+        case $enum::$name:
+            return static_cast<V*>(this)->visit$name(static_cast<const $name&>(node));
 """)
 
 VISIT_ROOT = Template("""\
@@ -124,11 +87,13 @@ class Node:
 
 
 class Hierarchy:
-    __slots__ = ("root", "nodes", "leaves", "buf")
+    __slots__ = ("root", "enum", "nodes", "leaves", "extern", "buf")
 
     def __init__(self, root):
         self.root = root
         self.nodes = []
+        self.extern = []
+
         if root.subclasses:
             self.leaves = []
             for subclass in root.subclasses:
@@ -136,10 +101,19 @@ class Hierarchy:
         else:
             self.leaves = [root]
 
+        if len(self.leaves) > 1:
+            self.enum = f"{root.name}Kind"
+        else:
+            self.enum = None
+
     def dfs(self, node):
         # TODO: check for loops
-        if node.fields is not None:
+
+        if node.fields is None:
+            self.extern.append(node)
+        else:
             self.nodes.append(node)
+
         if node.subclasses:
             for subclass in node.subclasses:
                 self.dfs(subclass)
@@ -152,11 +126,16 @@ class Hierarchy:
     def generate_decls(self):
         self.buf = StringIO()
 
+        if self.enum is not None:
+            self.generate_enum()
+
         self.write(f"struct {self.root.name} {{\n")
-        if len(self.leaves) > 1:
-            self.generate_tags()
+        if self.enum is not None:
+            self.write(f"    {self.enum} kind;\n")
         self.generate_fields(self.root)
         self.generate_constructor(self.root)
+        for node in chain(self.nodes, self.extern):
+            self.generate_isa(node)
         self.write("};\n")
 
         for node in self.nodes:
@@ -164,11 +143,33 @@ class Hierarchy:
 
         return self.buf.getvalue()
 
-    def generate_tags(self):
-        self.write("    enum Kind : int {\n")
+    def generate_enum(self):
+        self.write(f"enum struct {self.enum} {{\n")
         for leaf in self.leaves:
-            self.write(f"        {leaf.name},\n")
-        self.write("    } kind;\n")
+            self.write(f"    {leaf.name},\n")
+        self.write("};\n")
+
+    def generate_isa(self, node):
+        if self.enum is None:
+            isa = ISA_TRUE.substitute(
+                root=self.root.name,
+                name=node.name,
+            )
+        elif node.subclasses:
+            isa = ISA_BASE.substitute(
+                root=self.root.name,
+                name=node.name,
+                enum=self.enum,
+                first=find_min_leaf(node).name,
+                last=find_max_leaf(node).name,
+            )
+        else:
+            isa = ISA_LEAF.substitute(
+                root=self.root.name,
+                name=node.name,
+                enum=self.enum,
+            )
+        self.write(isa)
 
     def generate_node(self, node):
         if node.base:
@@ -179,7 +180,6 @@ class Hierarchy:
 
         self.generate_fields(node)
         self.generate_constructor(node)
-        self.generate_classof(node)
         self.write("};\n")
 
     def generate_fields(self, node):
@@ -190,13 +190,14 @@ class Hierarchy:
         if node.subclasses:
             return
 
+        node_fields = node.fields
         base_fields = get_base_fields(node)
-        all_fields = base_fields + node.fields
+        all_fields = base_fields + node_fields
 
         arguments = [f"{type} {name}" for name, type in all_fields]
 
-        if len(self.leaves) > 1:
-            base_init_list = [f"{self.root.name}::{node.name}"]
+        if self.enum is not None:
+            base_init_list = [f"{self.enum}::{node.name}"]
         else:
             base_init_list = []
         base_init_list.extend(name for name, _ in base_fields)
@@ -206,7 +207,7 @@ class Hierarchy:
             init_list = [f"{node.base.name}{{{base_init_list}}}"]
         else:
             init_list = []
-        init_list.extend(f"{name}({name})" for name, _ in node.fields)
+        init_list.extend(f"{name}({name})" for name, _ in node_fields)
 
         if not init_list:
             return
@@ -218,31 +219,15 @@ class Hierarchy:
         )
         self.write(constructor)
 
-    def generate_classof(self, node):
-        if len(self.leaves) == 1:
-            classof = CLASSOF_TRUE.substitute(root=self.root.name)
-        elif node.subclasses:
-            classof = CLASSOF_BASE.substitute(
-                root=self.root.name,
-                first=find_min_leaf(node).name,
-                last=find_max_leaf(node).name,
-            )
-        else:
-            classof = CLASSOF_LEAF.substitute(
-                root=self.root.name,
-                name=node.name,
-            )
-        self.write(classof)
-
     def generate_visitor(self):
         buf = StringIO()
 
-        if len(self.leaves) > 1:
+        if self.enum is not None:
             cases = [
                 VISITOR_CASE.substitute(
                     root=self.root.name,
                     name=node.name,
-                    cast=select_cast(node),
+                    enum=self.enum,
                 ) for node in self.leaves
             ]
             visitor = VISITOR.substitute(
@@ -254,12 +239,11 @@ class Hierarchy:
             visitor = VISITOR_DEGENERATE.substitute(
                 root=self.root.name,
                 name=node.name,
-                cast=select_cast(node),
             )
 
         buf.write(visitor)
         buf.write(VISIT_ROOT.substitute(name=self.root.name))
-        for node in set(self.nodes) | set(self.leaves) - {self.root}:
+        for node in chain(self.nodes, self.extern):
             buf.write(
                 VISIT_NODE.substitute(
                     name=node.name,
@@ -271,7 +255,7 @@ class Hierarchy:
 def get_base_fields(node):
     base = node.base
     if base is None:
-        return ()
+        return []
     return get_base_fields(base) + base.fields
 
 
@@ -287,25 +271,20 @@ def find_max_leaf(node):
     return find_max_leaf(node.subclasses[-1])
 
 
-def select_cast(node):
-    if node.fields is None:
-        return "incomplete_cast"
-    return "static_cast"
-
-
-def parse_type(field_type):
+def parse_type(field_type, type_map):
     if field_type.startswith("["):
         if not field_type.startswith("[]"):
             raise ValueError(f"invalid field type: {field_type}")
-        subtype = parse_type(field_type[2:])
-        return f"Span<{subtype} const>"
-    if field_type == "string":
-        return "std::string_view"
-    # TODO: check if field_type is valid
-    return f"const {field_type}*"
+        subtype = parse_type(field_type[2:], type_map)
+        return type_map["<array>"].substitute(T=subtype)
+
+    custom_type = type_map.get(field_type)
+    if custom_type is not None:
+        return custom_type
+    return type_map["<default>"].substitute(T=field_type)
 
 
-def make_node(name, decl, subclass_map):
+def make_node(name, decl, type_map, subclass_map):
     extern_base = decl.pop("<extern base>", None)
     if extern_base is not None:
         if decl:
@@ -315,7 +294,8 @@ def make_node(name, decl, subclass_map):
         return node
 
     base = decl.pop("<base>", None)
-    fields = tuple((name, parse_type(type)) for name, type in decl.items())
+    fields = [(name, parse_type(type, type_map))
+              for name, type in decl.items()]
     node = Node(name=name, base=base, fields=fields)
     subclass_map.setdefault(base, []).append(node)
     return node
@@ -328,11 +308,16 @@ if __name__ == "__main__":
 
     with open(sys.argv[1]) as f:
         data = json.load(f)
+    template = data.pop("<template>")
+    type_map = data.pop("<types>", {})
+
+    type_map["<default>"] = Template(type_map["<default>"])
+    type_map["<array>"] = Template(type_map["<array>"])
 
     nodes = {}
     subclass_map = {}
     for name, decl in data.items():
-        nodes[name] = make_node(name, decl, subclass_map)
+        nodes[name] = make_node(name, decl, type_map, subclass_map)
 
     roots = []
     declarations = []
@@ -351,9 +336,12 @@ if __name__ == "__main__":
         definitions.append(hierarchy.generate_decls())
         visitors.append(hierarchy.generate_visitor())
 
+    with open(template) as template:
+        template = "".join(template)
+
     with open(sys.argv[2], "w") as f:
         f.write(
-            HEADER.substitute(
+            Template(template).substitute(
                 declarations="".join(declarations),
                 definitions="".join(definitions),
                 visitors="".join(visitors),

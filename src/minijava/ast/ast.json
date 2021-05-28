@@ -1,30 +1,57 @@
 {
+    "<template>": "ast-template.tpp",
+    "<types>": {
+        "<default>": "$T const*",
+        "<array>": "Span<$T const>",
+        "bool": "bool",
+        "string": "std::string_view",
+        "symbol": "Symbol",
+        "loc": "Location",
+        "MethodAccess": "MethodAccess",
+        "Parameter": "Parameter"
+    },
+
     "Parameter": {
-        "name": "string",
-        "type": "string"
+        "name": "symbol",
+        "type": "symbol",
+        "name_loc": "loc",
+        "type_loc": "loc"
     },
 
     "ClassDecl": {
-        "name": "string",
-        "base": "string",
-        "records": "[]ClassRecord"
+        "name": "symbol",
+        "base": "symbol",
+        "records": "[]ClassRecord",
+        "name_loc": "loc",
+        "base_loc": "loc"
     },
 
     "ClassRecord": {},
     "ClassVarDecl": {
         "<base>": "ClassRecord",
-        "name": "string",
-        "type": "string"
+        "name": "symbol",
+        "type": "symbol",
+        "name_loc": "loc",
+        "type_loc": "loc"
     },
     "MethodDecl": {
-        "<extern base>": "ClassRecord"
+        "<base>": "ClassRecord",
+        "access": "MethodAccess",
+        "name": "symbol",
+        "retty": "symbol",
+        "params": "[]Parameter",
+        "body": "[]Stmt",
+        "name_loc": "loc",
+        "retty_loc": "loc"
     },
 
     "Stmt": {},
-    "VarDecl": {
+    "LocalVarDecl": {
         "<base>": "Stmt",
-        "name": "string",
-        "type": "string"
+        "name": "symbol",
+        "type": "symbol",
+        "name_loc": "loc",
+        "type_loc": "loc"
     },
     "CompoundStmt": {
         "<base>": "Stmt",
@@ -32,13 +59,13 @@
     },
     "IfStmt": {
         "<base>": "Stmt",
-        "condition": "Expr",
-        "if_branch": "Stmt",
+        "cond": "Expr",
+        "then_branch": "Stmt",
         "else_branch": "Stmt"
     },
     "WhileStmt": {
         "<base>": "Stmt",
-        "condition": "Expr",
+        "cond": "Expr",
         "body": "Stmt"
     },
     "ReturnStmt": {
@@ -47,21 +74,24 @@
     },
     "PrintStmt": {
         "<base>": "Stmt",
-        "arguments": "[]Expr"
+        "args": "[]Expr"
     },
     "AssignStmt": {
         "<base>": "Stmt",
-        "target": "Expr",
-        "value": "Expr"
+        "lhs": "Expr",
+        "rhs": "Expr",
+        "loc": "loc"
     },
 
     "Expr": {
-        "<base>": "Stmt"
+        "<base>": "Stmt",
+        "loc": "loc"
     },
     "BinaryExpr": {
         "<base>": "Expr",
         "lhs": "Expr",
-        "rhs": "Expr"
+        "rhs": "Expr",
+        "op_loc": "loc"
     },
     "MulExpr": { "<base>": "BinaryExpr" },
     "DivExpr": { "<base>": "BinaryExpr" },
@@ -77,10 +107,13 @@
     "AndExpr": { "<base>": "BinaryExpr" },
     "OrExpr":  { "<base>": "BinaryExpr" },
 
-    "NotExpr": {
+    "UnaryExpr": {
         "<base>": "Expr",
         "expr": "Expr"
     },
+    "NotExpr": { "<base>": "UnaryExpr" },
+    "NegExpr": { "<base>": "UnaryExpr" },
+
     "SubscriptExpr": {
         "<base>": "Expr",
         "array": "Expr",
@@ -89,8 +122,10 @@
     "CallExpr": {
         "<base>": "Expr",
         "object": "Expr",
-        "name": "string",
-        "arguments": "[]Expr"
+        "name": "symbol",
+        "args": "[]Expr",
+        "name_loc": "loc",
+        "args_loc": "loc"
     },
     "LengthExpr": {
         "<base>": "Expr",
@@ -102,20 +137,25 @@
     },
     "NewObjectExpr": {
         "<base>": "Expr",
-        "name": "string"
+        "name": "symbol",
+        "name_loc": "loc"
     },
     "IdentExpr": {
         "<base>": "Expr",
-        "name": "string"
+        "name": "symbol"
     },
     "IntLiteral": {
         "<base>": "Expr",
         "value": "string"
     },
-    "ThisExpr": {
-        "<extern base>": "Expr"
-    },
     "BoolLiteral": {
-        "<extern base>": "Expr"
+        "<base>": "Expr",
+        "value": "bool"
+    },
+    "NullExpr": {
+        "<base>": "Expr"
+    },
+    "ThisExpr": {
+        "<base>": "Expr"
     }
 }

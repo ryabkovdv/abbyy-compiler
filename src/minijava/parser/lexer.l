@@ -1,17 +1,16 @@
 %{
-#define YY_EXTRA_TYPE minijava::BumpAllocator*
+#define YY_EXTRA_TYPE minijava::detail::yy_extra_type*
+#include <minijava/parser/yyextra.hpp>
 #include <parser_impl.hpp>
+
+#define YY_USER_INIT yylineno = yycolumn = 1;
 
 #define YY_USER_ACTION                                                         \
     {                                                                          \
-        yylloc->first_line = yylloc->last_line;                                \
-        yylloc->first_column = yylloc->last_column;                            \
-        if (yylloc->last_line == yylineno) {                                   \
-            yylloc->last_column += yyleng;                                     \
-        } else {                                                               \
-            yylloc->last_line = yylineno;                                      \
-            yylloc->last_column = yytext + yyleng - strrchr(yytext, '\n');     \
-        }                                                                      \
+        yylloc->first_line = yylloc->last_line = yylineno;                     \
+        yylloc->first_column = yycolumn;                                       \
+        yylloc->last_column = yycolumn + yyleng - 1;                           \
+        yycolumn += yyleng;                                                    \
     }
 
 using namespace minijava;
@@ -20,7 +19,6 @@ using namespace minijava;
 %option 8bit reentrant never-interactive bison-bridge bison-locations
 %option warn noinput nounput noyywrap nodefault yylineno
 
-SPACE [\t\n\v\f\r ]+
 NUMBER [0-9]+
 IDENT [A-Za-z_][0-9A-Za-z_]*
 PRINT System\.out\.println
@@ -28,8 +26,10 @@ COMMENT \/\/[^\n]*
 
 %%
 
-{SPACE}         {}
 {COMMENT}       {}
+[\r ]+          {}
+"\t"            { yycolumn += 7; }
+"\n"            { yycolumn = 1; }
 
 "boolean"       { return TOK_BOOL; }
 "class"         { return TOK_CLASS; }
@@ -39,6 +39,7 @@ COMMENT \/\/[^\n]*
 "if"            { return TOK_IF; }
 "int"           { return TOK_INT; }
 "new"           { return TOK_NEW; }
+"null"          { return TOK_NULL; }
 "private"       { return TOK_PRIVATE; }
 "public"        { return TOK_PUBLIC; }
 "return"        { return TOK_RETURN; }
@@ -78,12 +79,14 @@ COMMENT \/\/[^\n]*
 ";"             { return TOK_SEMICOLON; }
 
 {NUMBER}        {
-                    yylval->string = dup_string(*yyextra, yytext, yyleng);
+                    yylval->string = dup_string(*yyextra->pool, yytext, yyleng);
                     return TOK_NUMBER;
                 }
 
 {IDENT}         {
-                    yylval->string = dup_string(*yyextra, yytext, yyleng);
+                    // TODO: remove useless allocation
+                    auto symbol = Symbol(*yyextra->pool, yytext, yyleng);
+                    yylval->symbol = *yyextra->symtab.insert(symbol).first;
                     return TOK_IDENT;
                 }
 

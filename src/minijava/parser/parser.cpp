@@ -1,8 +1,9 @@
-#define YY_EXTRA_TYPE minijava::BumpAllocator*
+#include <minijava/parser/parser.hpp>
+
+#define YY_EXTRA_TYPE minijava::detail::yy_extra_type*
+#include <minijava/parser/yyextra.hpp>
 #include <parser_impl.hpp>
 #include <lexer_impl.hpp>
-
-#include <minijava/parser/parser.hpp>
 
 using namespace minijava;
 
@@ -48,18 +49,21 @@ template <>
 struct std::is_error_code_enum<ParseError> : std::true_type {
 };
 
-std::error_code minijava::parse(FILE* file, AstTree* tree)
+std::error_code
+minijava::parse(std::string_view content, DiagnosticEngine& diag, AstTree* tree)
 {
     yyscan_t scanner;
-    if (yylex_init_extra(&tree->pool, &scanner) != 0)
+    detail::yy_extra_type yyextra_val{{}, &tree->pool};
+    if (yylex_init_extra(&yyextra_val, &scanner) != 0)
         return ParseError::InitFailure;
     ScopeExit free_scanner([&] { yylex_destroy(scanner); });
 
-    YY_BUFFER_STATE buffer = yy_create_buffer(file, YY_BUF_SIZE, scanner);
+    YY_BUFFER_STATE buffer =
+        yy_scan_bytes(content.data(), content.size(), scanner);
     ScopeExit free_buffer([&] { yy_delete_buffer(buffer, scanner); });
     yy_switch_to_buffer(buffer, scanner);
 
-    if (int status = yyparse(scanner, tree))
+    if (int status = yyparse(scanner, tree, diag))
         return ParseError{status};
     return {};
 }
