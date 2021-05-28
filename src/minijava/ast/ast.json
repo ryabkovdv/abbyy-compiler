@@ -1,36 +1,57 @@
 {
     "<template>": "ast-template.tpp",
     "<types>": {
+        "<default>": "$T const*",
+        "<array>": "Span<$T const>",
+        "bool": "bool",
         "string": "std::string_view",
-        "symbol": "Symbol"
+        "symbol": "Symbol",
+        "loc": "Location",
+        "MethodAccess": "MethodAccess",
+        "Parameter": "Parameter"
     },
 
     "Parameter": {
         "name": "symbol",
-        "type": "symbol"
+        "type": "symbol",
+        "name_loc": "loc",
+        "type_loc": "loc"
     },
 
     "ClassDecl": {
         "name": "symbol",
         "base": "symbol",
-        "records": "[]ClassRecord"
+        "records": "[]ClassRecord",
+        "name_loc": "loc",
+        "base_loc": "loc"
     },
 
     "ClassRecord": {},
     "ClassVarDecl": {
         "<base>": "ClassRecord",
         "name": "symbol",
-        "type": "symbol"
+        "type": "symbol",
+        "name_loc": "loc",
+        "type_loc": "loc"
     },
     "MethodDecl": {
-        "<extern base>": "ClassRecord"
+        "<base>": "ClassRecord",
+        "access": "MethodAccess",
+        "name": "symbol",
+        "retty": "symbol",
+        "params": "[]Parameter",
+        "body": "[]Stmt",
+        "name_loc": "loc",
+        "retty_loc": "loc"
     },
 
     "Stmt": {},
-    "VarDecl": {
+    "LocalVarDecl": {
         "<base>": "Stmt",
         "name": "symbol",
-        "type": "symbol"
+        "type": "symbol",
+        "name_loc": "loc",
+        "type_loc": "loc"
     },
     "CompoundStmt": {
         "<base>": "Stmt",
@@ -58,16 +79,19 @@
     "AssignStmt": {
         "<base>": "Stmt",
         "lhs": "Expr",
-        "rhs": "Expr"
+        "rhs": "Expr",
+        "loc": "loc"
     },
 
     "Expr": {
-        "<base>": "Stmt"
+        "<base>": "Stmt",
+        "loc": "loc"
     },
     "BinaryExpr": {
         "<base>": "Expr",
         "lhs": "Expr",
-        "rhs": "Expr"
+        "rhs": "Expr",
+        "op_loc": "loc"
     },
     "MulExpr": { "<base>": "BinaryExpr" },
     "DivExpr": { "<base>": "BinaryExpr" },
@@ -99,7 +123,9 @@
         "<base>": "Expr",
         "object": "Expr",
         "name": "symbol",
-        "args": "[]Expr"
+        "args": "[]Expr",
+        "name_loc": "loc",
+        "args_loc": "loc"
     },
     "LengthExpr": {
         "<base>": "Expr",
@@ -111,7 +137,8 @@
     },
     "NewObjectExpr": {
         "<base>": "Expr",
-        "name": "symbol"
+        "name": "symbol",
+        "name_loc": "loc"
     },
     "IdentExpr": {
         "<base>": "Expr",
@@ -122,12 +149,13 @@
         "value": "string"
     },
     "BoolLiteral": {
-        "<extern base>": "Expr"
+        "<base>": "Expr",
+        "value": "bool"
     },
     "NullExpr": {
-        "<extern base>": "Expr"
+        "<base>": "Expr"
     },
     "ThisExpr": {
-        "<extern base>": "Expr"
+        "<base>": "Expr"
     }
 }

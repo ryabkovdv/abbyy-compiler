@@ -59,18 +59,18 @@ union YYSTYPE {
         return *this;
     }
 
-    MethodDecl::Access access;
+    MethodAccess access;
     std::string_view string;
     Symbol symbol;
-    const Expr* expr;
-    const Stmt* stmt;
-    const ClassDecl* class_decl;
-    const ClassRecord* class_record;
-    GCArray<const ClassDecl*> classes;
-    GCArray<const ClassRecord*> class_records;
-    GCArray<const Stmt*> statements;
+    Expr* expr;
+    Stmt* stmt;
+    ClassDecl* class_decl;
+    ClassRecord* class_record;
+    GCArray<ClassDecl*> classes;
+    GCArray<ClassRecord*> class_records;
+    GCArray<Stmt*> statements;
     GCArray<Parameter> params;
-    GCArray<const Expr*> args;
+    GCArray<Expr*> args;
 };
 } // namespace minijava
 }
@@ -163,32 +163,32 @@ Main
 
 ClassDeclaration
     : "class" IDENT[name] BaseClass[base] "{" ClassRecords[records] "}"
-        { $$ = new(POOL) ClassDecl($name, $base, $records); }
+        { $$ = new(POOL) ClassDecl($name, $base, $records, @name, @base); }
 
 BaseClass
     : %empty { $$ = {}; }
-    | "extends" IDENT[name] { $$ = $name; }
+    | "extends" IDENT[name] { $$ = $name; @$ = @name; }
 
 ClassRecord
     : Type[type] IDENT[name] ";"
-        { $$ = new(POOL) ClassVarDecl($name, $type); }
+        { $$ = new(POOL) ClassVarDecl($name, $type, @name, @type); }
     | Access[access] Type[type] IDENT[name]
       "(" Parameters[params] ")" "{" Statements[body] "}"
-        { $$ = new(POOL) MethodDecl($access, $name, $type, $params, $body); }
+        { $$ = new(POOL) MethodDecl($access, $name, $type, $params, $body, @name, @type); }
 
 Access
-    : "public" { $$ = MethodDecl::Public; }
-    | "private" { $$ = MethodDecl::Private; }
+    : "public" { $$ = MethodAccess::Public; }
+    | "private" { $$ = MethodAccess::Private; }
 
 Type
-    : "boolean" { $$ = Symbol(POOL, "bool"); }
-    | "int" { $$ = Symbol(POOL, "int"); }
-    | "int" "[" "]" { $$ = Symbol(POOL, "int[]"); }
+    : "boolean" { $$ = BoolSymbol; }
+    | "int" { $$ = IntSymbol; }
+    | "int" "[" "]" { $$ = IntArraySymbol; }
     | IDENT[name] { $$ = $name; }
 
 Statement
     : Type[type] IDENT[name] ";"
-        { $$ = new(POOL) VarDecl($name, $type); }
+        { $$ = new(POOL) LocalVarDecl($name, $type, @name, @type); }
     | "{" Statements[body] "}"
         { $$ = new(POOL) CompoundStmt($body); }
     | "if" "(" Expression[cond] ")" Statement[then_branch]
@@ -202,65 +202,65 @@ Statement
         { $$ = new(POOL) PrintStmt($args); }
     | Expression[expr] ";"
         { $$ = $expr; }
-    | Expression[lhs] "=" Expression[rhs] ";"
-        { $$ = new(POOL) AssignStmt($lhs, $rhs); }
+    | Expression[lhs] "="[eq] Expression[rhs] ";"
+        { $$ = new(POOL) AssignStmt($lhs, $rhs, @eq); }
 
 Expression
     : PrimaryExpression
     | "!" Expression[expr]
-        { $$ = new(POOL) NotExpr($expr); }
+        { $$ = new(POOL) NotExpr(@$, $expr); }
     | "-" Expression[expr] %prec "!"
-        { $$ = new(POOL) NegExpr($expr); }
-    | Expression[lhs] "*" Expression[rhs]
-        { $$ = new(POOL) MulExpr($lhs, $rhs); }
-    | Expression[lhs] "/" Expression[rhs]
-        { $$ = new(POOL) DivExpr($lhs, $rhs); }
-    | Expression[lhs] "%" Expression[rhs]
-        { $$ = new(POOL) RemExpr($lhs, $rhs); }
-    | Expression[lhs] "+" Expression[rhs]
-        { $$ = new(POOL) AddExpr($lhs, $rhs); }
-    | Expression[lhs] "-" Expression[rhs]
-        { $$ = new(POOL) SubExpr($lhs, $rhs); }
-    | Expression[lhs] "!=" Expression[rhs]
-        { $$ = new(POOL) NeExpr($lhs, $rhs); }
-    | Expression[lhs] "==" Expression[rhs]
-        { $$ = new(POOL) EqExpr($lhs, $rhs); }
-    | Expression[lhs] "<" Expression[rhs]
-        { $$ = new(POOL) LtExpr($lhs, $rhs); }
-    | Expression[lhs] "<=" Expression[rhs]
-        { $$ = new(POOL) LeExpr($lhs, $rhs); }
-    | Expression[lhs] ">" Expression[rhs]
-        { $$ = new(POOL) GtExpr($lhs, $rhs); }
-    | Expression[lhs] ">=" Expression[rhs]
-        { $$ = new(POOL) GeExpr($lhs, $rhs); }
-    | Expression[lhs] "&&" Expression[rhs]
-        { $$ = new(POOL) AndExpr($lhs, $rhs); }
-    | Expression[lhs] "||" Expression[rhs]
-        { $$ = new(POOL) OrExpr($lhs, $rhs); }
+        { $$ = new(POOL) NegExpr(@$, $expr); }
+    | Expression[lhs] "*"[op] Expression[rhs]
+        { $$ = new(POOL) MulExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "/"[op] Expression[rhs]
+        { $$ = new(POOL) DivExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "%"[op] Expression[rhs]
+        { $$ = new(POOL) RemExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "+"[op] Expression[rhs]
+        { $$ = new(POOL) AddExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "-"[op] Expression[rhs]
+        { $$ = new(POOL) SubExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "!="[op] Expression[rhs]
+        { $$ = new(POOL) NeExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "=="[op] Expression[rhs]
+        { $$ = new(POOL) EqExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "<"[op] Expression[rhs]
+        { $$ = new(POOL) LtExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "<="[op] Expression[rhs]
+        { $$ = new(POOL) LeExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] ">"[op] Expression[rhs]
+        { $$ = new(POOL) GtExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] ">="[op] Expression[rhs]
+        { $$ = new(POOL) GeExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "&&"[op] Expression[rhs]
+        { $$ = new(POOL) AndExpr(@$, $lhs, $rhs, @op); }
+    | Expression[lhs] "||"[op] Expression[rhs]
+        { $$ = new(POOL) OrExpr(@$, $lhs, $rhs, @op); }
 
 PrimaryExpression
     : IDENT
-        { $$ = new(POOL) IdentExpr($1); }
+        { $$ = new(POOL) IdentExpr(@$, $1); }
     | NUMBER
-        { $$ = new(POOL) IntLiteral($1); }
+        { $$ = new(POOL) IntLiteral(@$, $1); }
     | "this"
-        { $$ = &ThisExpr::Instance; }
+        { $$ = new(POOL) ThisExpr(@$); }
     | "null"
-        { $$ = &NullExpr::Instance; }
+        { $$ = new(POOL) NullExpr(@$); }
     | "true"
-        { $$ = &BoolLiteral::True; }
+        { $$ = new(POOL) BoolLiteral(@$, true); }
     | "false"
-        { $$ = &BoolLiteral::False; }
+        { $$ = new(POOL) BoolLiteral(@$, false); }
     | "(" Expression ")"
         { $$ = $2; }
     | "new" "int" "[" Expression[count] "]"
-        { $$ = new(POOL) NewIntArrayExpr($count); }
+        { $$ = new(POOL) NewIntArrayExpr(@$, $count); }
     | "new" IDENT[name] "(" ")"
-        { $$ = new(POOL) NewObjectExpr($name); }
+        { $$ = new(POOL) NewObjectExpr(@$, $name, @name); }
     | PrimaryExpression[array] "[" Expression[index] "]"
-        { $$ = new(POOL) SubscriptExpr($array, $index); }
-    | PrimaryExpression[object] "." IDENT[name] "(" Arguments[args] ")"
-        { $$ = new(POOL) CallExpr($object, $name, $args); }
+        { $$ = new(POOL) SubscriptExpr(@$, $array, $index); }
+    | PrimaryExpression[object] "." IDENT[name] "("[paren] Arguments[args] ")"
+        { $$ = new(POOL) CallExpr(@$, $object, $name, $args, @name, @paren); }
     | PrimaryExpression[object] "." IDENT[name]
         {
             if ($name.to_view() != "length") {
@@ -268,7 +268,7 @@ PrimaryExpression
                         "only `length' property is supported");
                 YYERROR;
             }
-            $$ = new(POOL) LengthExpr($object);
+            $$ = new(POOL) LengthExpr(@$, $object);
         }
 
 Classes
@@ -292,9 +292,9 @@ Parameters
 
 ParameterList
     : Type[type] IDENT[name]
-        { init_array($$, POOL); $$.emplace_back($name, $type); }
+        { init_array($$, POOL); $$.emplace_back($name, $type, @name, @type); }
     | ParameterList[list] "," Type[type] IDENT[name]
-        { move_array($$, $list); $$.emplace_back($name, $type); }
+        { move_array($$, $list); $$.emplace_back($name, $type, @name, @type); }
 
 Arguments
     : %empty { init_array($$, POOL); }

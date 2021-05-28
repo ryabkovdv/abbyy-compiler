@@ -9,11 +9,7 @@ struct fmt::formatter<Symbol> : fmt::formatter<std::string_view> {
     template <typename FormatContext>
     auto format(Symbol symbol, FormatContext& ctx)
     {
-        fmt::memory_buffer buf;
-        fmt::format_to(buf, "{} ({})", symbol.to_view(),
-                       (const void*)symbol.to_view().data());
-        return fmt::formatter<std::string_view>::format(
-            {buf.data(), buf.size()}, ctx);
+        return fmt::formatter<std::string_view>::format(symbol.to_view(), ctx);
     }
 };
 
@@ -61,10 +57,10 @@ public:
     {
         int id = m_id++;
         std::string_view access =
-            (node.access == MethodDecl::Public) ? "public" : "private";
+            (node.access == MethodAccess::Public) ? "public" : "private";
         print(R"({}[label="{{MethodDecl|name: {}|ret_type: {}|access: {}|)"
               R"({{<params> params|<body> body}}}}"];)",
-              id, node.name, node.ret_type, access);
+              id, node.name, node.retty, access);
 
         print_list(node.params, id, "params");
         print_list(node.body, id, "body");
@@ -80,11 +76,11 @@ public:
         return id;
     }
 
-    int visitVarDecl(const VarDecl& node)
+    int visitLocalVarDecl(const LocalVarDecl& node)
     {
         int id = m_id++;
-        print(R"({}[label="{{VarDecl|name: {}|type: {}}}"];)", id, node.name,
-              node.type);
+        print(R"({}[label="{{LocalVarDecl|name: {}|type: {}}}"];)", id,
+              node.name, node.type);
         return id;
     }
 
@@ -164,19 +160,19 @@ public:
     {
         std::string_view name;
         switch (node.kind) {
-        case Expr::MulExpr: name = "MulExpr"; break;
-        case Expr::DivExpr: name = "DivExpr"; break;
-        case Expr::RemExpr: name = "RemExpr"; break;
-        case Expr::AddExpr: name = "AddExpr"; break;
-        case Expr::SubExpr: name = "SubExpr"; break;
-        case Expr::EqExpr:  name = "EqExpr";  break;
-        case Expr::NeExpr:  name = "NeExpr";  break;
-        case Expr::LtExpr:  name = "LtExpr";  break;
-        case Expr::LeExpr:  name = "LeExpr";  break;
-        case Expr::GtExpr:  name = "GtExpr";  break;
-        case Expr::GeExpr:  name = "GeExpr";  break;
-        case Expr::AndExpr: name = "AndExpr"; break;
-        case Expr::OrExpr:  name = "OrExpr";  break;
+        case StmtKind::MulExpr: name = "MulExpr"; break;
+        case StmtKind::DivExpr: name = "DivExpr"; break;
+        case StmtKind::RemExpr: name = "RemExpr"; break;
+        case StmtKind::AddExpr: name = "AddExpr"; break;
+        case StmtKind::SubExpr: name = "SubExpr"; break;
+        case StmtKind::EqExpr:  name = "EqExpr";  break;
+        case StmtKind::NeExpr:  name = "NeExpr";  break;
+        case StmtKind::LtExpr:  name = "LtExpr";  break;
+        case StmtKind::LeExpr:  name = "LeExpr";  break;
+        case StmtKind::GtExpr:  name = "GtExpr";  break;
+        case StmtKind::GeExpr:  name = "GeExpr";  break;
+        case StmtKind::AndExpr: name = "AndExpr"; break;
+        case StmtKind::OrExpr:  name = "OrExpr";  break;
         default: unreachable("invalid binary operation");
         }
 
@@ -195,8 +191,8 @@ public:
     {
         std::string_view name;
         switch (node.kind) {
-        case Expr::NotExpr: name = "NotExpr"; break;
-        case Expr::NegExpr: name = "NegExpr"; break;
+        case StmtKind::NotExpr: name = "NotExpr"; break;
+        case StmtKind::NegExpr: name = "NegExpr"; break;
         default: unreachable("invalid unary operation");
         }
 

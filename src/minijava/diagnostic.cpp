@@ -33,11 +33,6 @@ void DiagnosticEngine::do_diagnostic(DiagKind kind, std::string_view format,
         msg = "error: ";
         style = emphasis::bold | fg(terminal_color::red);
         break;
-    case DiagKind::Warning:
-        ++m_warnings;
-        msg = "warning: ";
-        style = emphasis::bold | fg(terminal_color::magenta);
-        break;
     case DiagKind::Note:
         msg = "note: ";
         style = emphasis::bold | fg(terminal_color::white);

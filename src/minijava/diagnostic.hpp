@@ -23,28 +23,10 @@ public:
         return m_errors;
     }
 
-    int warning_count() const noexcept
-    {
-        return m_warnings;
-    }
-
     template <typename... Args>
     void error(std::string_view format, const Args&... args)
     {
         do_diagnostic(DiagKind::Error, format, fmt::make_format_args(args...));
-    }
-
-    template <typename... Args>
-    void warn(std::string_view format, const Args&... args)
-    {
-        do_diagnostic(DiagKind::Warning, format,
-                      fmt::make_format_args(args...));
-    }
-
-    template <typename... Args>
-    void note(std::string_view format, const Args&... args)
-    {
-        do_diagnostic(DiagKind::Note, format, fmt::make_format_args(args...));
     }
 
     template <typename... Args>
@@ -55,10 +37,9 @@ public:
     }
 
     template <typename... Args>
-    void warn(Location loc, std::string_view format, const Args&... args)
+    void note(std::string_view format, const Args&... args)
     {
-        do_diagnostic(DiagKind::Warning, loc, format,
-                      fmt::make_format_args(args...));
+        do_diagnostic(DiagKind::Note, format, fmt::make_format_args(args...));
     }
 
     template <typename... Args>
@@ -69,14 +50,9 @@ public:
     }
 
 private:
-    enum struct DiagKind {
-        Error,
-        Warning,
-        Note,
-    };
+    enum struct DiagKind { Error, Note };
 
     int m_errors = 0;
-    int m_warnings = 0;
     FILE* m_output;
     std::vector<std::string_view> m_lines;
 

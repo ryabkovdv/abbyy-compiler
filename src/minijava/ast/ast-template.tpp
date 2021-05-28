@@ -2,63 +2,17 @@
 #define MINIJAVA_AST_DECL_HPP
 
 #include <minijava/utility.hpp>
+#include <minijava/diagnostic.hpp>
 
 namespace minijava {
 
+enum struct MethodAccess {
+    Public,
+    Private,
+};
+
 $declarations
 $definitions
-
-struct MethodDecl : ClassRecord {
-    enum Access : int {
-        Public,
-        Private,
-    };
-
-    Access access;
-    Symbol name;
-    Symbol ret_type;
-    Span<Parameter> params;
-    Span<Stmt const* const> body;
-
-    explicit constexpr MethodDecl(Access access, Symbol name, Symbol ret_type,
-                                  Span<Parameter> params,
-                                  Span<Stmt const* const> body)
-        : ClassRecord{ClassRecord::MethodDecl}, access(access), name(name),
-          ret_type(ret_type), params(params), body(body)
-    {}
-};
-
-struct BoolLiteral : Expr {
-    static const BoolLiteral True;
-    static const BoolLiteral False;
-
-    bool value;
-
-    explicit constexpr BoolLiteral(bool value)
-        : Expr{Stmt::BoolLiteral}, value(value)
-    {}
-};
-
-inline const BoolLiteral BoolLiteral::True{true};
-inline const BoolLiteral BoolLiteral::False{false};
-
-struct NullExpr : Expr {
-    static const NullExpr Instance;
-
-    constexpr NullExpr() : Expr{Stmt::NullExpr}
-    {}
-};
-
-inline const NullExpr NullExpr::Instance{};
-
-struct ThisExpr : Expr {
-    static const ThisExpr Instance;
-
-    constexpr ThisExpr() : Expr{Stmt::ThisExpr}
-    {}
-};
-
-inline const ThisExpr ThisExpr::Instance{};
 
 struct AstTree {
     Span<ClassDecl const* const> classes;

@@ -23,12 +23,25 @@
 #include <utility>
 
 namespace minijava {
+namespace detail {
 
 template <typename...>
-using int_t = int;
+struct int_t_helper {
+    using type = int;
+};
+
+} // namespace detail
+
+template <typename... Ts>
+using int_t = typename detail::int_t_helper<Ts...>::type;
 
 template <bool Cond>
 using int_if_t = std::enable_if_t<Cond, int>;
+
+template <typename T>
+struct type_tag {
+    using type = T;
+};
 
 [[noreturn]]
 inline void unreachable(const char* msg)
@@ -84,6 +97,7 @@ public:
     [[gnu::malloc, gnu::alloc_size(2), gnu::alloc_align(3)]]
     void* allocate(size_t size, size_t alignment)
     {
+        // return std::malloc(size);
         assert(alignment <= MaxAlign);
         assert(ptrdiff_t(size) >= 0 && "allocation size overflow");
 
@@ -359,34 +373,39 @@ class Symbol {
 public:
     Symbol() = default;
 
+    explicit constexpr Symbol(const char* str) noexcept : m_data(str)
+    {
+        assert(str[0] != '\0' && "cannot create symbol from empty string");
+    }
+
     template <typename... Args,
               int_if_t<std::is_constructible_v<std::string_view, Args...>> = 0>
     explicit Symbol(BumpAllocator& pool, Args&&... args)
     {
         std::string_view str(std::forward<Args>(args)...);
         assert(!str.empty() && "cannot create symbol from empty string");
+        assert(std::strlen(str.data()) == str.size() &&
+               "symbol cannot have NUL bytes");
 
-        void* ptr = pool.allocate(sizeof(Symbol::Value) + str.size(),
-                                  alignof(Symbol::Value));
-        auto* data = static_cast<char*>(ptr) + sizeof(Symbol::Value);
+        char* data = static_cast<char*>(pool.allocate(str.size() + 1, 1));
         std::memcpy(data, str.data(), str.size());
-        m_value = ::new (ptr) Symbol::Value{uint32_t(str.size())};
+        data[str.size()] = '\0';
+        m_data = data;
     }
 
-    bool empty() const noexcept
+    constexpr bool empty() const noexcept
     {
-        return m_value == &EmptyValue;
+        return m_data == nullptr;
     }
 
-    std::string_view to_view() const noexcept
+    constexpr std::string_view to_view() const noexcept
     {
-        return std::string_view(reinterpret_cast<const char*>(m_value + 1),
-                                m_value->len);
+        return std::string_view(m_data);
     }
 
     friend bool operator==(Symbol lhs, Symbol rhs) noexcept
     {
-        return lhs.m_value == rhs.m_value;
+        return lhs.m_data == rhs.m_data;
     }
 
     friend bool operator==(Symbol lhs, std::string_view rhs) noexcept
@@ -415,13 +434,7 @@ public:
     }
 
 private:
-    struct Value {
-        uint32_t len;
-    };
-
-    static constexpr Value EmptyValue{0};
-
-    const Value* m_value = &EmptyValue;
+    const char* m_data = nullptr;
 
     friend struct std::hash<Symbol>;
 };
@@ -461,7 +474,7 @@ using copy_cv_t = typename copy_cv<To, From>::type;
 
 template <typename To, typename From,
           int_t<decltype(To::classof(std::declval<const From&>()))> = 0>
-constexpr bool do_isa(const From& from, To*) noexcept
+constexpr bool do_isa(const From& from, type_tag<To>) noexcept
 {
     return To::classof(from);
 }
@@ -472,7 +485,7 @@ constexpr bool isa(const From& from) noexcept
     if constexpr (std::is_base_of_v<To, From>)
         return true;
     else
-        return do_isa(from, (To*)nullptr);
+        return do_isa(from, type_tag<To>{});
 }
 
 template <typename To, typename From>
@@ -492,6 +505,9 @@ constexpr auto cast(From& from) -> copy_cv_t<To, From>&
 template <typename To, typename From>
 constexpr auto cast(From* from) -> copy_cv_t<To, From>*
 {
+    if (from == nullptr)
+        return nullptr;
+
     assert(isa<To>(from));
     return static_cast<copy_cv_t<To, From>*>(from);
 }
@@ -499,7 +515,7 @@ constexpr auto cast(From* from) -> copy_cv_t<To, From>*
 template <typename To, typename From>
 constexpr auto dyn_cast(From* from) -> copy_cv_t<To, From>*
 {
-    if (!isa<To>(from))
+    if (from == nullptr || !isa<To>(from))
         return nullptr;
     return static_cast<copy_cv_t<To, From>*>(from);
 }
@@ -510,7 +526,7 @@ template <>
 struct std::hash<minijava::Symbol> {
     size_t operator()(minijava::Symbol symbol) const noexcept
     {
-        return std::hash<const void*>{}(symbol.m_value);
+        return std::hash<const void*>{}(symbol.m_data);
     }
 };
 
